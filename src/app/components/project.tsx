@@ -5,6 +5,7 @@ import { Tab } from "@mui/material"
 import { useRef, useEffect, useState } from 'react'
 import axios from 'axios';
 import { Report } from "./report";
+import useToken from "../auth/token";
 
 import List from '@mui/material/List';
 import ListItem from '@mui/material/ListItem';
@@ -12,6 +13,8 @@ import ListItemIcon from '@mui/material/ListItemIcon';
 import ListItemText from '@mui/material/ListItemText';
 import DatasetIcon from '@mui/icons-material/Dataset';
 import Grid from '@mui/material/Grid';
+
+
 
 
 export function Project() {
@@ -30,10 +33,19 @@ export function Project() {
     const [title, setTitle] = useState<string>('');
     const [description, setDescription] = useState<string>('');
 
+    const { token, removeToken, setToken } = useToken();
+
+    const chatParent = useRef<HTMLUListElement>(null)
+    useEffect(() => {
+        const domNode = chatParent.current
+        if (domNode) {
+            domNode.scrollTop = domNode.scrollHeight
+        }
+    })
+
     const filteredProjects = projects.filter(doc =>
         doc.title.toLowerCase().includes(searchQuery.toLowerCase())
     );
-
 
     const handleSelectAll = () => {
         if (selectedPrjs.length === filteredProjects.length) {
@@ -50,8 +62,18 @@ export function Project() {
 
     const fetchProjects = async () => {
         try {
-            const res = await axios.get('http://localhost:8080/get_projects');
+            const res = await axios.get('http://localhost:8080/get_projects',
+                {
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    }
+                }
+            );
             setProjects(res.data);
+            if (res.data.access_token) {
+                const new_token = res.data.access_token
+                setToken(new_token)
+            }
         } catch (error) {
             console.error('Error fetching documents:', error);
         }
@@ -59,15 +81,18 @@ export function Project() {
 
     const handleProjectDelete = async () => {
         try {
-            const response = await fetch('http://localhost:8080/delete_projects', {
-                method: 'POST',
+            const res = await axios.post('http://localhost:8080/delete_projects', selectedPrjs, {
                 headers: {
                     'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({ selectedPrjs }), // Make sure the key here matches what the backend expects
+                    'Authorization': `Bearer ${token}`
+                }
             });
             fetchProjects(); // Refresh the document list
             setSelectedPrjs([]); // Clear the selected documents
+            if (res.data.access_token) {
+                const new_token = res.data.access_token
+                setToken(new_token)
+            }
         } catch (error) {
             console.error('Error deleting documents:', error);
         }
@@ -97,15 +122,23 @@ export function Project() {
 
     const handleSaveProject = async () => {
         // API call to save project details
-        const response = await fetch('http://localhost:8080/create_project', {
-            method: 'POST',
+        const projectData = {
+            title: projectTitle,
+            description: projectDescription
+        }
+        console.log('Sending project data:', projectData)
+        const res = await axios.post('http://localhost:8080/create_project', projectData, {
             headers: {
                 'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
             },
-            body: JSON.stringify({ title: projectTitle, description: projectDescription }),
         });
 
-        if (response.ok) {
+        if (res) {
+            if (res.data.access_token) {
+                const new_token = res.data.access_token
+                setToken(new_token)
+            }
             setOpenDialog(false);
         } else {
             // Handle error
@@ -114,21 +147,20 @@ export function Project() {
     };
 
     const handleEnterProject = (projectID: number, title: string, description: string ) => {
-
         setProjectID(projectID);
         setTitle(title);
         setDescription(description);
         setShowTabs(true);
-
     };
 
 
     return (
         <main className="flex flex-col w-full h-screen max-h-dvh bg-background">
-            <header className="p-4 border-b w-full max-w-3xl mx-auto">
-                <h1 className="text-2xl font-bold">Generate DPIA</h1>
+            
+            <header className="p-4 border-b w-full h-16 bg-gradient-to-r from-purple-500 to-pink-500">
+                <h1 className="text-3xl font-bold">PROJECT</h1>
             </header>
-            <section className="p-4 w-full max-w-3xl mx-auto">
+            <section className="p-4 flex-1 overflow-auto" ref={chatParent}>
 
                 {!showTabs ? (
                     <Button variant="contained" color="success" onClick={handleCreateProject}>Create Project</Button>
@@ -147,17 +179,20 @@ export function Project() {
                             onChange={handleSearchChange}
                             fullWidth
                             margin="normal"
+                            style={{ margin: '15px 0', }}
                         />
+
+                        {filteredProjects.length > 0 && (
+                        <div>
+                        <Button onClick={handleSelectAll} variant="contained" color="secondary">
+                            {selectedPrjs.length === filteredProjects.length ? 'Deselect All' : 'Select All'}
+                        </Button>
                         {selectedPrjs.length > 0 && (
-                        <Button variant="contained" color="secondary" onClick={handleProjectDelete}>
+                        <Button variant="contained" color="secondary" onClick={handleProjectDelete} style={{ marginLeft: '20px' }}>
                             Delete
                         </Button>
                         )}
-
-                        {filteredProjects.length > 0 && (
-                        <Button onClick={handleSelectAll} variant="contained" color="secondary" style={{ marginLeft: '20px' }}>
-                            {selectedPrjs.length === filteredProjects.length ? 'Deselect All' : 'Select All'}
-                        </Button>
+                        </div>
                         )}
                         <Grid container spacing={2}>
                             <Grid item xs={12}>
@@ -170,7 +205,7 @@ export function Project() {
                                             boxShadow: '0px 3px 6px rgba(0, 0, 0, 0.1)', // Light shadow to make items stand out
                                             display: 'flex',
                                             justifyContent: 'space-between',
-                                            margin: '15px 0',
+                                            margin: '10px 0',
                                             alignItems: 'center', }}
                                     
                                     >
@@ -198,6 +233,7 @@ export function Project() {
                     <Report projectID={projectID} title={title} description={description}/>
                 )}      
             </section>
+
             <Dialog open={openDialog} onClose={handleCloseDialog}>
                 <DialogTitle>Create Project</DialogTitle>
                 <DialogContent>
@@ -205,6 +241,7 @@ export function Project() {
                         autoFocus
                         margin="dense"
                         label="Project Title"
+                        required
                         fullWidth
                         value={projectTitle}
                         onChange={(e) => setProjectTitle(e.target.value)}

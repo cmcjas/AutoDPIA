@@ -12,12 +12,12 @@ def check_path(path):
     if not os.path.exists(path):
         os.makedirs(path)
 
-def clear_chat_embed(vectorstore, BASE_DIR):
+def clear_chat_embed(vectorstore, user_id, BASE_DIR):
 
     existing_documents = vectorstore.get(where={"usage": "chat"})['ids']
-    DIR_U = os.path.join(BASE_DIR, "uploads", "chat")
-    DIR_F = os.path.join(BASE_DIR, "figures", "chat")
-    DIR_FD = os.path.join(BASE_DIR, "figures", "description")
+    DIR_U = os.path.join(BASE_DIR, "uploads", str(user_id), "chat")
+    DIR_F = os.path.join(BASE_DIR, "figures", str(user_id), "chat")
+    DIR_FD = os.path.join(BASE_DIR, "figures", str(user_id), "chatDescription")
 
     if len(existing_documents) > 0:
         for ids in existing_documents:
@@ -29,13 +29,20 @@ def clear_chat_embed(vectorstore, BASE_DIR):
             print(f"Removed directory: {directory_path}")
         else:
             print(f"Directory does not exist: {directory_path}")
-    
 
+
+def chat_dict(chatMessage):
+    chat_history_dict = {}
+    for i, message in enumerate(chatMessage):
+        role, text = message.split(": ", 1)
+        chat_history_dict[f"message_{i}"] = {"role": role, "text": text}
+    return chat_history_dict
+        
 class Element(BaseModel):
     type: str
     text: Any
 
-def partition_process(UP_DIR_C, filename, IMG_DIR_C, IMG_DIR_CD, model, retriever, id_key, file_name, embed_type, usage):
+def partition_process(UP_DIR, filename, IMG_DIR_C, IMG_DIR_CD, model, retriever, id_key, file_name, embed_type, usage, mode):
         
         # initial prompt
         prompt_int = """You are an assistant tasked with summarizing tables and text. \
@@ -44,7 +51,7 @@ def partition_process(UP_DIR_C, filename, IMG_DIR_C, IMG_DIR_CD, model, retrieve
 
         # Get PDF elements
         pdf_elements = partition_pdf(
-            filename=os.path.join(UP_DIR_C, filename),
+            filename=os.path.join(UP_DIR, filename),
             # Using pdf format to find embedded image blocks
             extract_images_in_pdf=True,
             # Use layout model (YOLOX) to get bounding boxes (for tables) and find titles
@@ -92,14 +99,14 @@ def partition_process(UP_DIR_C, filename, IMG_DIR_C, IMG_DIR_CD, model, retrieve
         text_elements = [e for e in categorized_elements if e.type == "text"]
         print(len(text_elements))
 
-        chain = {"element": lambda x: x} | prompt | model | StrOutputParser()
+        summary_chain = {"element": lambda x: x} | prompt | model | StrOutputParser()
 
         # Apply to text
         texts = [i.text for i in text_elements]
-        text_summary = chain.batch(texts, {"max_concurrency": 5})
+        text_summary = summary_chain.batch(texts, {"max_concurrency": 5})
         # Apply to tables
         tables = [i.text for i in table_elements]
-        table_summary = chain.batch(tables, {"max_concurrency": 5})
+        table_summary = summary_chain.batch(tables, {"max_concurrency": 5})
 
         # Loop through each image in the directory
         img_name = ""
@@ -117,7 +124,7 @@ def partition_process(UP_DIR_C, filename, IMG_DIR_C, IMG_DIR_CD, model, retrieve
 
             # Use the ollama.chat function to send the image and retrieve the description
             description = ollama.chat(
-                model="llava:13b",  
+                model="llava",  
                 messages=[message]
             )
 
@@ -140,7 +147,7 @@ def partition_process(UP_DIR_C, filename, IMG_DIR_C, IMG_DIR_CD, model, retrieve
         if texts:
             doc_ids = [str(uuid.uuid4()) for _ in texts]
             summary_texts = [
-                Document(page_content=s, metadata={id_key: doc_ids[i], file_name: filename, embed_type: "text", usage: "chat"})
+                Document(page_content=s, metadata={id_key: doc_ids[i], file_name: filename, embed_type: "text", usage: mode})
                 for i, s in enumerate(text_summary)
             ]
             retriever.vectorstore.add_documents(summary_texts)
@@ -150,7 +157,7 @@ def partition_process(UP_DIR_C, filename, IMG_DIR_C, IMG_DIR_CD, model, retrieve
         if tables:
             table_ids = [str(uuid.uuid4()) for _ in tables]
             summary_tables = [
-                Document(page_content=s, metadata={id_key: table_ids[i], file_name: filename, embed_type: "table", usage: "chat"})
+                Document(page_content=s, metadata={id_key: table_ids[i], file_name: filename, embed_type: "table", usage: mode})
                 for i, s in enumerate(table_summary)
             ]
             retriever.vectorstore.add_documents(summary_tables)
@@ -160,10 +167,22 @@ def partition_process(UP_DIR_C, filename, IMG_DIR_C, IMG_DIR_CD, model, retrieve
         if img_summary:
             img_ids = [str(uuid.uuid4()) for _ in img_summary]
             summary_img = [
-                Document(page_content=s, metadata={id_key: img_ids[i], file_name: filename, embed_type: "image", usage: "chat"})
+                Document(page_content=s, metadata={id_key: img_ids[i], file_name: filename, embed_type: "image", usage: mode})
                 for i, s in enumerate(img_summary)
             ]
             retriever.vectorstore.add_documents(summary_img)
             retriever.docstore.mset(list(zip(img_ids, img_summary)))
 
-        return chain
+        return summary_chain
+
+def llm_response(retriever, previousMessage, msg, chat_chain):
+
+    retriever = retriever.invoke(msg)
+    answer = chat_chain.invoke(
+        {
+            "context": retriever,
+            "chat_history": previousMessage,
+            "input": msg,
+        }
+    )  
+    return answer        

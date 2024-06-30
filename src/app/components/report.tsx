@@ -2,10 +2,12 @@
 
 import { Button, Dialog, DialogActions, DialogContent, DialogTitle, Box, Checkbox, TextField } from "@mui/material";
 import { Tab } from "@mui/material"
-import { useRef, useEffect, useState } from 'react'
+import { useEffect, useState } from 'react'
 import axios from 'axios';
-import { pdfjs, Document, Page } from 'react-pdf';
+import { pdfjs } from 'react-pdf';
 import PDFView from "./view";
+import useToken from "../auth/token";
+import { Dpia } from "./dpia";
 
 import List from '@mui/material/List';
 import ListItem from '@mui/material/ListItem';
@@ -19,8 +21,8 @@ pdfjs.GlobalWorkerOptions.workerSrc = new URL(
     import.meta.url,
   ).toString();
   
-
 import React from 'react';
+
 
 interface ReportProps {
   projectID: number;
@@ -42,6 +44,9 @@ export function Report(props: ReportProps) {
     const [selectedDocs, setSelectedDocs] = useState<number[]>([]);
     const [searchQuery, setSearchQuery] = useState<string>('');
 
+    const [selectedDpiaDocs, setSelectedDpiaDocs] = useState<number[]>([]);
+    const [selectedDpiaDocName, setSelectedDpiaDocName] = useState<string[]>([]);
+
     const filteredDocuments = documents.filter(doc =>
         doc.fileName.toLowerCase().includes(searchQuery.toLowerCase())
     );
@@ -49,7 +54,7 @@ export function Report(props: ReportProps) {
     const projectID = props.projectID;
     const title = props.title;
     const description = props.description;
-
+    const { token, removeToken, setToken } = useToken();
 
     const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
         if (event.target.files) {
@@ -59,11 +64,21 @@ export function Report(props: ReportProps) {
 
     const handleSelectAll = () => {
         if (selectedDocs.length === filteredDocuments.length) {
-          setSelectedDocs([]);
+            setSelectedDocs([]);
         } else {
-          setSelectedDocs(filteredDocuments.map(doc => doc.fileID));
+            setSelectedDocs(filteredDocuments.map(doc => doc.fileID));
         }
       };
+
+    const handleSelectDpiaAll = () => {
+        if (selectedDpiaDocs.length === filteredDocuments.length) {
+            setSelectedDpiaDocs([]);
+            setSelectedDpiaDocName([]);
+        } else {
+            setSelectedDpiaDocs(filteredDocuments.map(doc => doc.fileID));
+            setSelectedDpiaDocName(filteredDocuments.map(doc => doc.fileName));
+        }
+    };
     
     const handleUpload = async () => {
         if (selectedFiles.length === 0) {
@@ -85,18 +100,24 @@ export function Report(props: ReportProps) {
         try {
             const res = await axios.post('http://localhost:8080/upload_doc', formData, {
                 headers: {
-                  'Content-Type': 'multipart/form-data'
+                  'Content-Type': 'multipart/form-data',
+                  'Authorization': `Bearer ${token}`
                 }
               });
 
             if (res) {
                 const sql = await axios.post('http://localhost:8080/toSQL', formData, {
                 headers: {
-                    'Content-Type': 'multipart/form-data'
+                    'Content-Type': 'multipart/form-data',
+                    'Authorization': `Bearer ${token}`
                 }
                 });
                 setUploadMessage(`File(s) uploaded successfully`);
                 fetchDocuments(); // Refresh the document list
+                if (res.data.access_token) {
+                    const new_token = res.data.access_token
+                    setToken(new_token)
+                }
             } else {
                 setUploadMessage(`Error uploading file`);
             }
@@ -112,9 +133,17 @@ export function Report(props: ReportProps) {
 
     const fetchDocuments = async () => {
         try {
-            const res = await axios.get('http://localhost:8080/get_files', {params: { projectID: projectID }});
+            const res = await axios.get('http://localhost:8080/get_files', {params: { projectID: projectID }, 
+                headers: {
+                'Authorization': `Bearer ${token}`
+            }
+        });
 
             setDocuments(res.data);
+            if (res.data.access_token) {
+                const new_token = res.data.access_token
+                setToken(new_token)
+            }
         } catch (error) {
             console.error('Error fetching documents:', error);
         }
@@ -122,24 +151,42 @@ export function Report(props: ReportProps) {
 
     const handleFileDelete = async () => {
         try {
-            const response = await fetch('http://localhost:8080/delete_files', {
-                method: 'POST',
+            const res = await axios.post('http://localhost:8080/delete_files', selectedDocs, {
                 headers: {
                     'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
                 },
-                body: JSON.stringify({ selectedDocs }), // Make sure the key here matches what the backend expects
             });
             fetchDocuments(); // Refresh the document list
             setSelectedDocs([]); // Clear the selected documents
+            if (res.data.access_token) {
+                const new_token = res.data.access_token
+                setToken(new_token)
+            }
         } catch (error) {
             console.error('Error deleting documents:', error);
         }
     };
 
-    const handleView = (fileID: number, fileName: string,) => {
+    const handleView = async (fileID: number, fileName: string,) => {
         setOpen(true);
-        setSelectedDoc(`http://localhost:8080/view_files/${fileID}?projectID=${projectID}`);
         setSelectedDocName(fileName);
+
+        
+        const res = await axios.get(`http://localhost:8080/view_files/${fileID}?projectID=${projectID}`, {
+            headers: {
+                'Authorization': `Bearer ${token}`,
+            },
+            responseType: 'blob'
+        });
+        const url = window.URL.createObjectURL(new Blob([res.data]));
+        setSelectedDoc(url);
+
+        if (res.data.access_token) {
+            const new_token = res.data.access_token
+            setToken(new_token)
+        }
+
     };
 
     const handleClose = () => {
@@ -155,6 +202,16 @@ export function Report(props: ReportProps) {
         }
     };
 
+    const dpiaCheckboxChange = (event: React.ChangeEvent<HTMLInputElement>, doc: { fileID: number; fileName: string; }) => {
+        if (event.target.checked) {
+            setSelectedDpiaDocs([...selectedDpiaDocs, doc.fileID]);
+            setSelectedDpiaDocName([...selectedDpiaDocName, doc.fileName]);
+        } else {
+            setSelectedDpiaDocs(selectedDpiaDocs.filter(id => id !== doc.fileID));
+            setSelectedDpiaDocName(selectedDpiaDocName.filter(name => name !== doc.fileName));
+        }
+    };
+
     // search logics
     const handleSearchChange = (event: React.ChangeEvent<HTMLInputElement>) => {
         setSearchQuery(event.target.value);
@@ -164,21 +221,21 @@ export function Report(props: ReportProps) {
 
     return (
         <main className="flex flex-col w-full h-screen max-h-dvh bg-background">
-            <Box bgcolor="#ededed" p={0.5} borderRadius={1} style={{ marginTop: '20px' }}>
+            <Box bgcolor="#ededed" p={0.5} borderRadius={1} style={{ marginTop: '20px'}}>
                 <header className="p-4 border-b w-full max-w-3xl mx-auto">
                     <h1 className="text-2xl font-bold">Project: {title}</h1>
                     <h2>{description}</h2>
                 </header>
-
-                    <Tab onClick={() => setActiveTab('files')} label='Files'></Tab>
-                    <Tab onClick={() => setActiveTab('reports')} label='Reports'></Tab>
-
+                    <Tab onClick={() => setActiveTab('files')} label='Files' style={{ backgroundColor: activeTab === 'files' ? '#1c1d1f' : 'transparent',
+                     color: activeTab === 'files' ? 'white' : 'black' }}></Tab>
+                    <Tab onClick={() => setActiveTab('reports')} label='Dpias' style={{ backgroundColor: activeTab === 'reports' ? '#1c1d1f' : 'transparent',
+                     color: activeTab === 'reports' ? 'white' : 'black' }}></Tab>
             </Box>
 
-            <section className="p-4 w-full max-w-3xl mx-auto">
+            <section className="p-4 flex-1 overflow-auto">
                 {activeTab === 'files' ? (
                     <div>
-                        <input type="file" multiple onChange={handleFileChange} />
+                        <input type="file" multiple onChange={handleFileChange} accept=".txt,.docx,.pdf"/>
                         <Button onClick={handleUpload} variant="contained" color="success" >Upload</Button>
                         {uploadMessage && <p>{uploadMessage}</p>}
 
@@ -190,19 +247,25 @@ export function Report(props: ReportProps) {
                             value={searchQuery}
                             onChange={handleSearchChange}
                             fullWidth
-                            margin="normal"
+                            style={{ margin: '15px 0', }}
                         />
+
+                        {filteredDocuments.length > 0 && (
+                        <div>
+                        <Button onClick={handleSelectAll} variant="contained" color="secondary" >
+                            {selectedDocs.length === filteredDocuments.length ? 'Deselect All' : 'Select All'}
+                        </Button>
+                        <Button onClick={handleSelectDpiaAll} variant="contained" color="secondary" style={{ marginLeft: '20px' }}>
+                            {selectedDpiaDocs.length === filteredDocuments.length ? 'Deselect All Dpia Files' : 'Select All Dpia Files'}
+                        </Button>
                         {selectedDocs.length > 0 && (
-                        <Button variant="contained" color="secondary" onClick={handleFileDelete}>
+                        <Button variant="contained" color="secondary" onClick={handleFileDelete} style={{ marginLeft: '20px' }}>
                             Delete
                         </Button>
                         )}
-
-                        {filteredDocuments.length > 0 && (
-                        <Button onClick={handleSelectAll} variant="contained" color="secondary" style={{ marginLeft: '20px' }}>
-                            {selectedDocs.length === filteredDocuments.length ? 'Deselect All' : 'Select All'}
-                        </Button>
+                        </div>
                         )}
+                        
                         <Grid container spacing={2}>
                             <Grid item xs={12}>
                             
@@ -214,7 +277,7 @@ export function Report(props: ReportProps) {
                                             boxShadow: '0px 3px 6px rgba(0, 0, 0, 0.1)', // Light shadow to make items stand out
                                             display: 'flex',
                                             justifyContent: 'space-between',
-                                            margin: '15px 0',
+                                            margin: '10px 0',
                                             alignItems: 'center', }}
                                     
                                     >
@@ -228,6 +291,10 @@ export function Report(props: ReportProps) {
                                         <ListItemText
                                             primary={doc.fileName}
                                         />
+                                    <Checkbox
+                                        checked={selectedDpiaDocs.includes(doc.fileID)}
+                                        onChange={(event) => dpiaCheckboxChange(event, doc)}
+                                    />
                                         <div >
                                             <Button onClick={() => handleView(doc.fileID, doc.fileName)} variant="contained" color="primary" style={{ marginRight: '10px' }}>View</Button>
                                         </div>
@@ -240,7 +307,7 @@ export function Report(props: ReportProps) {
                     </div>
                     
                 ) : (
-                    <div>Hello Reports</div>
+                    <Dpia projectID={projectID} dpiaFileNames={selectedDpiaDocName}/>
                 )}
             </section>
             <Dialog open={open} onClose={handleClose}  fullWidth maxWidth="lg">

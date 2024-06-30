@@ -56,6 +56,9 @@
   }
 
   body {
-    @apply bg-background text-foreground;
+    @apply bg-no-repeat bg-cover bg-[center_center] bg-fixed relative;
+    background-image: linear-gradient(rgba(219, 191, 205, 0.7), rgba(217, 231, 248, 0.7)), url('/ComfyUI_00001_.png');
   }
+
 }
+

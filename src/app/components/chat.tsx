@@ -1,6 +1,5 @@
 'use client'
 
-import Input from '@mui/material/Input';
 import Button from '@mui/material/Button';
 import { useRef, useEffect, useState } from 'react'
 import axios from 'axios';
@@ -9,6 +8,7 @@ import {Box} from "@mui/material";
 
 import SmartToyIcon from '@mui/icons-material/SmartToy';
 import PersonIcon from '@mui/icons-material/Person';
+import useToken from '../auth/token';
 
 
 interface Message {
@@ -26,6 +26,7 @@ export function Chat() {
     const [ragMode, setRagMode] = useState<boolean>(false);
 
     const chatParent = useRef<HTMLUListElement>(null)
+    const { token, removeToken, setToken } = useToken();
 
     useEffect(() => {
         const domNode = chatParent.current
@@ -54,10 +55,25 @@ export function Chat() {
         setResponse((prevMessages) => [...prevMessages, userMessage]);
 
         try {
-            const res = await axios.post('http://localhost:8080/get_msg', { message: input, ragMode: ragMode, fileName: fileName});
+            const res = await axios.post('http://localhost:8080/get_msg', 
+                { 
+                    message: input, 
+                    ragMode: ragMode, 
+                    fileName: fileName 
+                },
+                {
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    }
+                }
+            );
 
             const botMessage: Message = { sender: 'bot', text: res.data['reply'] };
             setResponse((prevMessages) => [...prevMessages, botMessage]);
+            if (res.data.access_token) {
+                const new_token = res.data.access_token
+                setToken(new_token)
+            }
         } catch (error) {
             console.error('Error:', error);
             const errorMessage: Message = { sender: 'bot', text: 'An error occurred while fetching the response.' };
@@ -72,7 +88,17 @@ export function Chat() {
         setResponse((prevMessages) => [...prevMessages, { sender: 'bot', text: ' Chat cleared successfully. I am now here to help you with your DPIA.' }]);
 
         try {
-            const clear = await axios.post('http://localhost:8080/clear_chat');
+            const res = await axios.get('http://localhost:8080/clear_chat',
+                {
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    }
+                }
+            );
+            // if (res.data.access_token) {
+            //     const new_token = res.data.access_token
+            //     setToken(new_token)
+            // }
         } catch (error) {
             console.error('Error:', error);
             const errorMessage: Message = { sender: 'bot', text: ' An error occurred while clearing the chat.' };
@@ -93,13 +119,18 @@ export function Chat() {
         try {
           const res = await axios.post('http://localhost:8080/upload_doc', formData, {
             headers: {
-              'Content-Type': 'multipart/form-data'
+              'Content-Type': 'multipart/form-data',
+              'Authorization': `Bearer ${token}`
             }
           });
 
           setFileName(res.data['filename']);
           setResponse((prevMessages) => [...prevMessages, { sender: 'bot', text: ` File uploaded successfully, I'm now your document assistant: ${res.data['filename']}` }]);
           setRagMode(true);
+          if (res.data.access_token) {
+            const new_token = res.data.access_token
+            setToken(new_token)
+            }
 
           console.log('File uploaded successfully');
         } catch (error) {
@@ -110,12 +141,12 @@ export function Chat() {
     return (
         <main className="flex flex-col w-full h-screen max-h-dvh bg-background">
 
-            <header className="p-4 border-b w-full max-w-3xl mx-auto">
-                <h1 className="text-2xl font-bold">Chat</h1>
+            <header className="p-4 border-b w-full h-16 bg-gradient-to-r from-purple-500 to-pink-500">
+                <h1 className="text-3xl font-bold">CHAT</h1>
             </header>
 
             <section className="p-4 flex-1 overflow-auto" ref={chatParent}>
-            <Box bgcolor="#e0e0e0" p={3} borderRadius={4} style={{ marginTop: '20px' }}>
+            <Box bgcolor="#e0e0e0" p={3} borderRadius={4} style={{ marginTop: '20px'}}>
                 <ul className="flex flex-col w-full max-w-3xl mx-auto space-y-2">
                     {responses.map((message, index) => (
                         <li
@@ -133,15 +164,15 @@ export function Chat() {
             </section>
 
 
-            <section className="p-4">
+            <section>
                 <form onSubmit={handleSubmit} className="flex w-full max-w-3xl mx-auto items-center">
                     <TextField className="flex-1 min-h-[40px] min-w-[50%]" variant="outlined" placeholder="Type your question here..." value={input} onChange={handleInputChange} />
-                    <Button className="ml-2" type="submit" variant="contained">
+                    <Button className="ml-2" type="submit" variant="contained" style={{marginLeft: '15px'}}>
                         Submit
                     </Button>
                 </form>
                 <form onSubmit={docSubmit} className="flex w-full max-w-3xl mx-auto items-center">
-                    <Input type="file" onChange={handleFileChange} />
+                    <input type="file" onChange={handleFileChange} accept=".txt,.docx,.pdf"/>
                     <Button className="ml-2" type="submit" variant="outlined">
                     Upload
                     </Button>

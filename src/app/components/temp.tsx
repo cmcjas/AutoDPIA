@@ -1,8 +1,11 @@
 'use client'
 
-import { Button, TextField, Dialog, DialogActions, DialogContent, DialogTitle } from "@mui/material";
+import { Button, TextField, Dialog, DialogActions, DialogContent, DialogTitle, MenuItem, Box } from "@mui/material";
 import { useRef, useEffect, useState } from 'react'
 import axios from 'axios';
+import Select, { SelectChangeEvent } from '@mui/material/Select';
+
+import useToken from '../auth/token';
 
 export function Template() {
 
@@ -10,17 +13,45 @@ export function Template() {
     const [selectedTemplate, setSelectedTemplate] = useState<string>('');
     const [error, setError] = useState(false);
 
-    useEffect(() => {
-        fetch('http://localhost:8080/get_templates')
-          .then(response => response.json())
-          .then(data => setTemplates(data));
-      }, [error]);
+    const [open, setOpen] = useState(false);
+    const [name, setName] = useState('');
+    const { token, removeToken, setToken } = useToken();
 
-    const handleSelectChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
-        setSelectedTemplate(event.target.value);
+    const chatParent = useRef<HTMLUListElement>(null)
+    useEffect(() => {
+        const domNode = chatParent.current
+        if (domNode) {
+            domNode.scrollTop = domNode.scrollHeight
+        }
+    })
+
+    useEffect(() => {
+        const fetchTemplates = async () => {
+            try {
+                const res = await axios.get('http://localhost:8080/get_templates', {
+                headers: {
+                    'Authorization': `Bearer ${token}`
+                }
+                });
+                setTemplates(res.data);
+                if (res.data.access_token) {
+                    const new_token = res.data.access_token
+                    setToken(new_token)
+                }
+            } catch (err) {
+                setError(error);
+            }
+            };
+        fetchTemplates();
+    }, [error, open, token]);
+
+    const handleSelectChange = (event: SelectChangeEvent<unknown>) => {
+        setSelectedTemplate(event.target.value as string);
     };
 
+
     const selectedTemplateData = templates.find(template => template.tempName === selectedTemplate)?.tempData??'';
+    
     let templateData: Record<string, Record<string, string>> = {};
     templateData = {} as Record<string, Record<string, string>>;
 
@@ -33,19 +64,21 @@ export function Template() {
         templateData = JSON.parse(selectedTemplateData);
     }
 
-    console.log(templateData, editableData);
-
     const saveTemplateData = async () => {
         try {
-            const res = await fetch('http://localhost:8080/select_template', {
-                method: 'POST',
+            const res = await axios.post('http://localhost:8080/select_template', editableData, {
                 headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify(editableData)
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+
+                }
             });
 
-            if (res.ok) {
+            if (res) {
+                if (res.data.access_token) {
+                    const new_token = res.data.access_token
+                    setToken(new_token)
+                }
                 console.log('Template data saved successfully.');
             } else {
                 console.error('Failed to save template data.');
@@ -176,8 +209,6 @@ export function Template() {
         setEditableData(reorderedData);
     };
 
-    
-
     const [openTitle, setOpenTitle] = useState(false);
     const [currentStep, setCurrentStep] = useState<string | null>(null);
     const [currentTitle, setCurrentTitle] = useState('');
@@ -190,32 +221,26 @@ export function Template() {
         setOpenTitle(true);
       };
     
-      const handleCloseTitle = () => {
-        setOpenTitle(false);
-        setCurrentStep(null);
-        setCurrentTitle('');
-        setNewTitle('');
-      };
-    
-      const handleTitleSubmit = () => {
-        if (currentStep && currentTitle) {
-          setEditableData(prevData => {
-            const updatedData = { ...prevData };
-            const stepData = updatedData[currentStep];
-            if (stepData && stepData[currentTitle]) {
-              const sectionData = stepData[currentTitle];
-              delete stepData[currentTitle];
-              if (newTitle !== '') {
-                stepData[newTitle] = sectionData;
-              } else {
-                stepData[currentTitle] = sectionData;
-              }
-            }
-            return updatedData;
-          });
-        }
-        handleCloseTitle();
-      };
+    const handleCloseTitle = () => {
+    setOpenTitle(false);
+    setCurrentStep(null);
+    setCurrentTitle('');
+    setNewTitle('');
+    };
+
+    const handleTitleSubmit = () => {
+    if (currentStep && currentTitle) {
+        setEditableData(prevData => {
+        const updatedData = { ...prevData };
+        const stepData = updatedData[currentStep];
+        const newSection = JSON.stringify(stepData).split(`"${currentTitle}":`).join(`"${newTitle}":`)
+        updatedData[currentStep] = JSON.parse(newSection);
+        
+        return updatedData;
+        });
+    }
+    handleCloseTitle();
+    };
 
     const handlePromptChange = (step: string, title: string, newPrompt: string) => {
         setEditableData(prevData => {
@@ -225,10 +250,6 @@ export function Template() {
         });
     };
 
-
-
-    const [open, setOpen] = useState(false);
-    const [name, setName] = useState('');
 
     const handleClickOpen = () => {
         setOpen(true);
@@ -245,15 +266,18 @@ export function Template() {
           return;
         }
     
-        const response = await fetch('http://localhost:8080/save_template', {
-          method: 'POST',
+        const res = await axios.post('http://localhost:8080/save_template', { tempName: name }, {
           headers: {
             'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ tempName: name }),
+            'Authorization': `Bearer ${token}`
+          }
         });
     
-        if (response.ok) {
+        if (res) {
+            if (res.data.access_token) {
+                const new_token = res.data.access_token
+                setToken(new_token)
+            }
           // handle success
           handleClose();
         } else {
@@ -262,28 +286,50 @@ export function Template() {
       };
 
 
+      const handleDelete = async () => {
+        setError(true);
+        const res = await axios.post('http://localhost:8080/delete_template', selectedTemplate, {
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+            },
+        });
+        if (res) {
+            setError(false);
+            if (res.data.access_token) {
+                const new_token = res.data.access_token
+                setToken(new_token)
+            }
+
+        }
+      }
+
+
     return (
         <main className="flex flex-col w-full h-screen max-h-dvh bg-background">
-            <header className="p-4 border-b w-full max-w-3xl mx-auto">
-                <h1 className="text-2xl font-bold">Template</h1>
+
+            <header className="p-4 border-b w-full h-16 bg-gradient-to-r from-purple-500 to-pink-500">
+                <h1 className="text-3xl font-bold">TEMPLATE</h1>
             </header>
 
+            <section className="p-4 flex-1 overflow-auto" ref={chatParent}>
             <div>
-                <h1>Choose a Template</h1>
-                <select value={selectedTemplate} onChange={handleSelectChange}>
-                    <option value="">Select...</option>
+                <h1 className="text-1xl font-bold">Choose a Template</h1>
+                <Select value={selectedTemplate} label="Template" onChange={handleSelectChange}>
+                    <MenuItem value="">None...</MenuItem>
                     {templates.map(template => (
-                    <option key={template.tempName} value={template.tempName}>
+                    <MenuItem key={template.tempName} value={template.tempName}>
                         {template.tempName}
-                    </option>
+                    </MenuItem>
                     ))}
-                </select>
+                </Select>
 
                 {selectedTemplate && selectedTemplateData && (
                     <div>
+                    <Box bgcolor="#e0e0e0" p={3} borderRadius={4} style={{ marginTop: '20px' }}>
                     {Object.entries(editableData).map(([step, sections]) => (
                     <div key={step}>
-                        <h2>{step}</h2>
+                        <h1 className="text-1xl font-bold">{step}</h1>
                         <Button variant="outlined" onClick={() => handleAddStep(step)}>Add Step</Button>
                         <Button variant="outlined" onClick={() => handleDeleteStep(step)}>Delete Step</Button>
                         {Object.entries(sections).map(([title, prompt], index) => (
@@ -356,14 +402,21 @@ export function Template() {
                             </Dialog>
                     </div>
                     ))}
+                    </Box>
                 </div>
                 )}
             </div>
             {selectedTemplate && selectedTemplateData && (
+            <div style={{marginTop:'15px'}}>
             <Button variant="contained" color="primary" onClick={handleClickOpen}>
                 Save
             </Button>
+            <Button variant="outlined" onClick={handleDelete} color="secondary" style={{marginLeft: '10px'}}>
+                Delete
+            </Button>
+            </div>
             )}
+            </section>
         </main>
     )
 
