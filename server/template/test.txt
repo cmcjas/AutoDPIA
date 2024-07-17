@@ -1,9 +1,0 @@
-{
-  "Step 1": {
-    "Introduction": "Summarize the content of the document briefly",
-    "Keywords": "List all keywords in the document and explain them in a concise manner"
-  },
-  "Step 2": {
-    "Conclusion": "What's the overall finding conveyed by the document"
-  }
-}

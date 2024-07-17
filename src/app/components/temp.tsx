@@ -152,43 +152,67 @@ export function Template() {
         setEditableData(updatedData);
     };
 
+
     const handleAddStep = (step: string) => {
         // Create a copy of the current editableData
         const updatedData = { ...editableData };
-
+    
         // Parse the step number from the current step string
-        const currentStepNumber = parseInt(step.replace('Step ', ''), 10);
-
+        const stepMatch = step.match(/Step\s(\d+)/);
+        const currentStepNumber = stepMatch ? parseInt(stepMatch[1], 10) : NaN;
+    
         // Create a new step to add
-        const newStepNumber = currentStepNumber + 1;
-        const newStep = `Step ${newStepNumber}`;
-
-        // Create an array of step keys, sorted by step number
-        const stepKeys = Object.keys(updatedData).sort((a, b) => {
-            const stepA = parseInt(a.replace('step ', ''), 10);
-            const stepB = parseInt(b.replace('step ', ''), 10);
-            return stepA - stepB;
-        });
-
+        const newStepNumber = isNaN(currentStepNumber) ? 'NaN' : currentStepNumber + 1;
+    
+        // Get all step keys
+        const stepKeys = Object.keys(updatedData);
+    
         // Insert the new step and shift subsequent steps
-        for (let i = stepKeys.length; i >= currentStepNumber; i--) {
-            const stepKey = `Step ${i + 1}`;
-            updatedData[stepKey] = updatedData[`Step ${i}`];
+        const newUpdatedData: Record<string, Record<string, string>> = {};
+        let stepInserted = false;
+    
+        for (let i = 0; i < stepKeys.length; i++) {
+            const oldStepMatch = stepKeys[i].match(/(Step\s\d+)(.*)/);
+            if (oldStepMatch) {
+                const oldStepNumber = parseInt(oldStepMatch[1].replace('Step ', ''), 10);
+                const suffix = oldStepMatch[2];
+    
+                if (oldStepNumber === currentStepNumber && !stepInserted) {
+                    // Insert the new step right after the current step
+                    newUpdatedData[`Step ${oldStepNumber}${suffix}`] = updatedData[stepKeys[i]];
+                    newUpdatedData[`Step ${newStepNumber} - `] = { 'Role': '' };
+                    stepInserted = true;
+                } else if (oldStepNumber > currentStepNumber) {
+                    // Shift the subsequent steps
+                    newUpdatedData[`Step ${oldStepNumber + 1}${suffix}`] = updatedData[stepKeys[i]];
+                } else {
+                    newUpdatedData[stepKeys[i]] = updatedData[stepKeys[i]];
+                }
+            } else {
+                // Preserve non-standard step names
+                newUpdatedData[stepKeys[i]] = updatedData[stepKeys[i]];
+                if (stepKeys[i] === step && !stepInserted) {
+                    // Insert the new step after the non-standard step
+                    newUpdatedData[`Step ${newStepNumber}`] = { 'Role': '' };
+                    stepInserted = true;
+                }
+            }
         }
-
-        // Add the new step with a default title and empty prompt
-        updatedData[newStep] = {
-            'Role': ''
-        };
-
+    
+        // If the new step was not inserted (in case the current step number is the highest or non-standard), add it at the end
+        if (!stepInserted) {
+            newUpdatedData[`Step ${newStepNumber}`] = { 'Role': '' };
+        }
+    
         // Update the state with the new data
-        setEditableData(updatedData);
+        setEditableData(newUpdatedData);
     };
+
 
     const handleDeleteStep = (step: string) => {
         // Create a copy of the current editableData
         const updatedData = { ...editableData };
-
+    
         // Check if there is only one step left
         if (Object.keys(updatedData).length === 1) {
             return; // Do not delete if there is only one step left
@@ -197,24 +221,73 @@ export function Template() {
         // Delete the specified step
         delete updatedData[step];
     
-        // Reorder the remaining steps if necessary
-        const reorderedData :  Record<string, Record<string, string>> = {};
-        let stepCounter = 1;
-        Object.keys(updatedData).sort().forEach((step) => {
-            reorderedData[`Step ${stepCounter}`] = updatedData[step];
-            stepCounter++;
+        // Separate non-standard steps from standard 'Step X' steps
+        const nonStandardSteps: Record<string, Record<string, string>> = {};
+        const standardSteps: Record<string, Record<string, string>> = {};
+        const originalOrder: string[] = Object.keys(editableData);
+    
+        Object.keys(updatedData).forEach((key) => {
+            if (key.startsWith('Step ')) {
+                standardSteps[key] = updatedData[key];
+            } else {
+                nonStandardSteps[key] = updatedData[key];
+            }
+        });
+    
+        // Reorder the remaining standard 'Step X' steps while keeping the suffix
+        const reorderedSteps: Record<string, Record<string, string>> = {};
+        let mainStepCounter = 1;
+        let subStepCounters: Record<number, number> = {};
+    
+        Object.keys(standardSteps).forEach((key) => {
+            const match = key.match(/(Step\s\d+)(\.\d+)?(.*)/);
+            if (match) {
+                const mainStepNumber = parseInt(match[1].replace('Step ', ''), 10);
+                const subStepNumber = match[2] ? parseInt(match[2].replace('.', ''), 10) : null;
+                const suffix = match[3];
+    
+                if (subStepNumber === null) {
+                    // This is a main step
+                    reorderedSteps[`Step ${mainStepCounter}${suffix}`] = standardSteps[key];
+                    subStepCounters[mainStepCounter] = 1; // Initialize sub-step counter for this main step
+                    mainStepCounter++;
+                } else {
+                    // This is a sub-step
+                    const parentStepNumber = mainStepCounter - 1; // Attach to the last main step
+                    reorderedSteps[`Step ${parentStepNumber}.${subStepCounters[parentStepNumber]}${suffix}`] = standardSteps[key];
+                    subStepCounters[parentStepNumber]++;
+                }
+            }
+        });
+    
+        // Merge reordered steps and non-standard steps back into the original order
+        const finalData: Record<string, Record<string, string>> = {};
+    
+        originalOrder.forEach((key) => {
+            if (nonStandardSteps[key]) {
+                finalData[key] = nonStandardSteps[key];
+            } else {
+                const reorderedKey = Object.keys(reorderedSteps).find((rk) => reorderedSteps[rk] === updatedData[key]);
+                if (reorderedKey) {
+                    finalData[reorderedKey] = reorderedSteps[reorderedKey];
+                }
+            }
         });
     
         // Update the state with the new data
-        setEditableData(reorderedData);
+        setEditableData(finalData);
     };
+    
 
     const [openTitle, setOpenTitle] = useState(false);
     const [currentStep, setCurrentStep] = useState<string | null>(null);
     const [currentTitle, setCurrentTitle] = useState('');
     const [newTitle, setNewTitle] = useState('');
 
-    const handleOpenTitle = (step: string, title: string, index: number) => {
+    const [openStep, setOpenStep] = useState(false);
+    const [newStep, setNewStep] = useState('');
+
+    const handleOpenTitle = (step: string, title: string) => {
         setCurrentStep(step);
         setCurrentTitle(title);
         setNewTitle(title);
@@ -227,6 +300,18 @@ export function Template() {
     setCurrentTitle('');
     setNewTitle('');
     };
+
+    const handleOpenStep = (step: string) => {
+        setOpenStep(true);
+        setCurrentStep(step);
+        setNewStep(step);
+    }
+
+    const handleCloseStep = () => {
+        setOpenStep(false);
+        setCurrentStep(null);
+        setNewStep('');
+    }
 
     const handleTitleSubmit = () => {
     if (currentStep && currentTitle) {
@@ -241,6 +326,18 @@ export function Template() {
     }
     handleCloseTitle();
     };
+
+    const handleStepSubmit = () => {
+        if (currentStep) {
+            setEditableData(prevData => {
+                const updatedData = { ...prevData };
+                const newStepSection = JSON.stringify(updatedData).split(`"${currentStep}":`).join(`"${newStep}":`);
+                return JSON.parse(newStepSection);
+            });
+
+        }
+        handleCloseStep();
+    }
 
     const handlePromptChange = (step: string, title: string, newPrompt: string) => {
         setEditableData(prevData => {
@@ -326,17 +423,23 @@ export function Template() {
 
                 {selectedTemplate && selectedTemplateData && (
                     <div>
-                    <Box bgcolor="#e0e0e0" p={3} borderRadius={4} style={{ marginTop: '20px' }}>
                     {Object.entries(editableData).map(([step, sections]) => (
                     <div key={step}>
-                        <h1 className="text-1xl font-bold">{step}</h1>
+                        <Box bgcolor="#e0e0e0" p={3} borderRadius={4} style={{ marginTop: '20px' }}>
+                        <Button
+                            variant="contained"
+                            onClick={() => handleOpenStep(step)}
+                            fullWidth
+                        >
+                            {step}
+                        </Button>
                         <Button variant="outlined" onClick={() => handleAddStep(step)}>Add Step</Button>
                         <Button variant="outlined" onClick={() => handleDeleteStep(step)}>Delete Step</Button>
                         {Object.entries(sections).map(([title, prompt], index) => (
                         <div key={title} style={{ marginBottom: '1rem' }}>
                                 <Button
                                     variant="outlined"
-                                    onClick={() => handleOpenTitle(step, title, index)}
+                                    onClick={() => handleOpenTitle(step, title)}
                                     fullWidth
                                     style={{ marginBottom: '0.5rem' }}
                                 >
@@ -354,9 +457,10 @@ export function Template() {
                             <Button variant="outlined" onClick={() => handleDeletePart(step, title)}>Delete Part</Button>
                         </div>
                         ))}
+                        </Box>
 
                         <Dialog open={openTitle} onClose={handleCloseTitle}>
-                                <DialogTitle>Enter a new title:</DialogTitle>
+                                <DialogTitle>Enter a new Title:</DialogTitle>
                                 <DialogContent>
                                 <TextField
                                     autoFocus
@@ -375,40 +479,61 @@ export function Template() {
                                     Submit
                                 </Button>
                                 </DialogActions>
-                            </Dialog>
+                        </Dialog>
 
-                            <Dialog open={open} onClose={handleClose}>
-                                <DialogTitle>Enter a Name</DialogTitle>
+                        <Dialog open={openStep} onClose={handleCloseStep}>
+                                <DialogTitle>Enter a new Step:</DialogTitle>
                                 <DialogContent>
                                 <TextField
                                     autoFocus
                                     margin="dense"
-                                    label="Template Name"
+                                    type="text"
                                     fullWidth
-                                    value={name}
-                                    onChange={(e) => setName(e.target.value)}
-                                    error={error}
-                                    helperText={error ? "Name cannot be empty" : ""}
+                                    value={newStep}
+                                    onChange={(e) => setNewStep(e.target.value)}
                                 />
                                 </DialogContent>
                                 <DialogActions>
-                                <Button onClick={handleClose} color="secondary">
+                                <Button onClick={handleCloseStep} color="primary">
                                     Cancel
                                 </Button>
-                                <Button onClick={handleSave} color="primary">
-                                    Save
+                                <Button onClick={handleStepSubmit} color="primary">
+                                    Submit
                                 </Button>
                                 </DialogActions>
-                            </Dialog>
+                        </Dialog>
+
+                        <Dialog open={open} onClose={handleClose}>
+                            <DialogTitle>Enter a Name</DialogTitle>
+                            <DialogContent>
+                            <TextField
+                                autoFocus
+                                margin="dense"
+                                label="Template Name"
+                                fullWidth
+                                value={name}
+                                onChange={(e) => setName(e.target.value)}
+                                error={error}
+                                helperText={error ? "Name cannot be empty" : ""}
+                            />
+                            </DialogContent>
+                            <DialogActions>
+                            <Button onClick={handleClose} color="secondary">
+                                Cancel
+                            </Button>
+                            <Button onClick={handleSave} color="primary">
+                                Save
+                            </Button>
+                            </DialogActions>
+                        </Dialog>
                     </div>
                     ))}
-                    </Box>
                 </div>
                 )}
             </div>
             {selectedTemplate && selectedTemplateData && (
             <div style={{marginTop:'15px'}}>
-            <Button variant="contained" color="primary" onClick={handleClickOpen}>
+            <Button variant="contained" color="success" onClick={handleClickOpen}>
                 Save
             </Button>
             <Button variant="outlined" onClick={handleDelete} color="secondary" style={{marginLeft: '10px'}}>

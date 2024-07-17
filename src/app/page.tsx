@@ -78,15 +78,16 @@ export default function Page() {
           <Image src={AutoDPIA_transparent} alt="AutoDPIA Logo" width={40} height={40} style={{marginLeft: '10px'}}/>
         </header>
         
-        <div style={{ display: 'flex', flexDirection: 'column', marginTop: '20px' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', marginTop: '20px', height: '85vh' }}>
           <Button color='secondary' onClick={() => setSelectedComponent('chat')} style={{ marginBottom: '20px', backgroundColor: selectedComponent === 'chat' ? '#1c5b99' : 'transparent',
                      color: selectedComponent === 'chat' ? 'white' : 'black' }} variant="outlined"><h1 className="text-1xl font-bold ">Chat</h1></Button>
           <Button color='secondary' onClick={() => setSelectedComponent('temp')} style={{ marginBottom: '20px', backgroundColor: selectedComponent === 'temp' ? '#1c5b99' : 'transparent',
                       color: selectedComponent === 'temp' ? 'white' : 'black' }} variant="outlined"><h1 className="text-1xl font-bold ">Template</h1></Button>
           <Button color='secondary' onClick={() => setSelectedComponent('project') } style={{backgroundColor: selectedComponent === 'project' ? '#1c5b99' : 'transparent',
                       color: selectedComponent === 'project' ? 'white' : 'black' }}variant="outlined"><h1 className="text-1xl font-bold ">Project</h1></Button>
-          <h1 className="text-1xl font-bold " style={{ bottom: '-57vh', position: 'relative'}} >Welcome {email}</h1>
-          <Button onClick={handleLogout} style={{ bottom: '-60vh' }} color='secondary' variant="contained">Logout</Button>
+          <div style={{ flexGrow: 1 }}></div> 
+          <h1 className="text-1xl font-bold " >WELCOME:  <span style={{ marginLeft: '5px' }}>{email}</span></h1>
+          <Button onClick={handleLogout} color='secondary' variant="contained" style={{marginTop:'10px'}}>Logout</Button>
         </div>
       </div>
 

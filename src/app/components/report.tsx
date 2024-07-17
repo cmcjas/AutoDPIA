@@ -8,12 +8,15 @@ import { pdfjs } from 'react-pdf';
 import PDFView from "./view";
 import useToken from "../auth/token";
 import { Dpia } from "./dpia";
+import Snackbar, { SnackbarOrigin } from '@mui/material/Snackbar';
+import { styled } from '@mui/material/styles';
 
 import List from '@mui/material/List';
 import ListItem from '@mui/material/ListItem';
 import ListItemIcon from '@mui/material/ListItemIcon';
 import ListItemText from '@mui/material/ListItemText';
 import FolderIcon from '@mui/icons-material/Folder';
+import CloudUploadIcon from '@mui/icons-material/CloudUpload';
 import Grid from '@mui/material/Grid';
 
 pdfjs.GlobalWorkerOptions.workerSrc = new URL(
@@ -30,10 +33,22 @@ interface ReportProps {
   description: string;
 }
 
+const VisuallyHiddenInput = styled('input')({
+    clip: 'rect(0 0 0 0)',
+    clipPath: 'inset(50%)',
+    height: 1,
+    overflow: 'hidden',
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    whiteSpace: 'nowrap',
+    width: 1,
+  });
+
+
 export function Report(props: ReportProps) {
 
     const [activeTab, setActiveTab] = useState('files');
-    const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
     const [uploadMessage, setUploadMessage] = useState('');
 
     const [open, setOpen] = useState(false);
@@ -56,10 +71,62 @@ export function Report(props: ReportProps) {
     const description = props.description;
     const { token, removeToken, setToken } = useToken();
 
-    const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+
+
+    const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+        
+        let selected_files: File[] = [];
+
         if (event.target.files) {
-            setSelectedFiles(Array.from(event.target.files));
+            selected_files = Array.from(event.target.files);
         }
+
+        if (selected_files.length === 0) {
+            setUploadMessage('No file selected');
+            return;
+        }
+
+        const formData = new FormData();
+
+        selected_files.forEach(async (file) => {
+            // Upload each file
+            formData.append('File', file);
+        });
+
+        formData.append('Mode', 'report')
+        formData.append('projectID', projectID.toString());
+
+
+        try {
+            const res = await axios.post('http://localhost:8080/upload_doc', formData, {
+                headers: {
+                  'Content-Type': 'multipart/form-data',
+                  'Authorization': `Bearer ${token}`
+                }
+              });
+
+
+            if (res) {
+                const sql = await axios.post('http://localhost:8080/toSQL', formData, {
+                headers: {
+                    'Content-Type': 'multipart/form-data',
+                    'Authorization': `Bearer ${token}`
+                }
+                });
+                setUploadMessage(`File(s) uploaded successfully`);
+                fetchDocuments(); // Refresh the document list
+                if (res.data.access_token) {
+                    const new_token = res.data.access_token
+                    setToken(new_token)
+                }
+                event.target.value = ''; // clear the input after uploading
+            } else {
+                setUploadMessage(`Error uploading file`);
+            }
+        } catch (error) {
+            setUploadMessage(`Error uploading file`);
+        }
+
     };
 
     const handleSelectAll = () => {
@@ -80,52 +147,6 @@ export function Report(props: ReportProps) {
         }
     };
     
-    const handleUpload = async () => {
-        if (selectedFiles.length === 0) {
-            setUploadMessage('No file selected');
-            return;
-        }
-
-        const formData = new FormData();
-
-        selectedFiles.forEach(async (file) => {
-            // Upload each file
-            formData.append('File', file);
-        });
-
-        formData.append('Mode', 'report')
-        formData.append('projectID', projectID.toString());
-
-
-        try {
-            const res = await axios.post('http://localhost:8080/upload_doc', formData, {
-                headers: {
-                  'Content-Type': 'multipart/form-data',
-                  'Authorization': `Bearer ${token}`
-                }
-              });
-
-            if (res) {
-                const sql = await axios.post('http://localhost:8080/toSQL', formData, {
-                headers: {
-                    'Content-Type': 'multipart/form-data',
-                    'Authorization': `Bearer ${token}`
-                }
-                });
-                setUploadMessage(`File(s) uploaded successfully`);
-                fetchDocuments(); // Refresh the document list
-                if (res.data.access_token) {
-                    const new_token = res.data.access_token
-                    setToken(new_token)
-                }
-            } else {
-                setUploadMessage(`Error uploading file`);
-            }
-        } catch (error) {
-            setUploadMessage(`Error uploading file`);
-        }
-    };
-
 
     useEffect(() => {
         fetchDocuments();
@@ -218,6 +239,14 @@ export function Report(props: ReportProps) {
     };
 
 
+    /* snackbar logics */
+    interface State extends SnackbarOrigin {}
+    const [state, setState] = React.useState<State>({
+        vertical: 'top',
+        horizontal: 'center',
+      });
+    const { vertical, horizontal } = state;
+
 
     return (
         <main className="flex flex-col w-full h-screen max-h-dvh bg-background">
@@ -235,9 +264,27 @@ export function Report(props: ReportProps) {
             <section className="p-4 flex-1 overflow-auto">
                 {activeTab === 'files' ? (
                     <div>
-                        <input type="file" multiple onChange={handleFileChange} accept=".txt,.docx,.pdf"/>
-                        <Button onClick={handleUpload} variant="contained" color="success" >Upload</Button>
-                        {uploadMessage && <p>{uploadMessage}</p>}
+                        <Button
+                            component="label"
+                            variant="contained"
+                            color="success"
+                            tabIndex={-1}
+                            startIcon={<CloudUploadIcon />}
+                            style={{marginLeft: '10px', marginRight: '15px'}}
+                        >
+                            Upload
+                            <VisuallyHiddenInput type="file" multiple onChange={handleFileChange} accept=".txt,.docx,.pdf" />
+                        </Button>
+                        <Box sx={{ width: 500 }}>
+                        <Snackbar
+                            anchorOrigin={{ vertical, horizontal }}
+                            autoHideDuration={1000}
+                            open={uploadMessage !== ''}
+                            onClose={() => setUploadMessage('')}
+                            message="File(s) uploaded successfully."
+                            key={vertical + horizontal}
+                        />
+                        </Box>
 
                         <Box bgcolor="#e0e0e0" p={3} borderRadius={4} style={{ marginTop: '20px' }}>
                         <TextField

@@ -45,6 +45,7 @@ class DPIA(db.Model):
     dpiaID = db.Column(db.Integer, primary_key=True, autoincrement=True)
     projectID = db.Column(db.Integer, db.ForeignKey('project.projectID'), nullable=False)
     title = db.Column(db.String(255), nullable=False)
+    status = db.Column(db.String(80), nullable=False)
 
     def __repr__(self):
         return f'<Dpia {self.title}>'
