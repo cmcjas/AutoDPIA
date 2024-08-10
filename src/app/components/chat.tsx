@@ -9,7 +9,6 @@ import { styled } from '@mui/material/styles';
 
 import SmartToyIcon from '@mui/icons-material/SmartToy';
 import PersonIcon from '@mui/icons-material/Person';
-import useToken from '../auth/token';
 import CloudUploadIcon from '@mui/icons-material/CloudUpload';
 
 
@@ -19,6 +18,10 @@ interface Message {
     type?: 'text' | 'gif';
     src?: string;
     buttons?: { label: string, onClick: () => void, disabled?: boolean }[];
+}
+
+interface ChatProps {
+    token: string | null;
 }
 
 const VisuallyHiddenInput = styled('input')({
@@ -33,7 +36,7 @@ const VisuallyHiddenInput = styled('input')({
     width: 1,
   });
 
-export function Chat() {
+const Chat: React.FC<ChatProps> = ({ token }) => {
 
     const [input, setInput] = useState('');
     const [fetching, setFetching] = useState<boolean>(false);
@@ -52,15 +55,10 @@ export function Chat() {
         }]);
     const [fileName, setFileName] = useState<string>('');
     const [pdfMode, setPdfMode] = useState<boolean>(false);
-
-    const chatParent = useRef<HTMLUListElement>(null)
-    const { token, removeToken, setToken } = useToken();
+    const chatParent = useRef<HTMLUListElement>(null);
 
     useEffect(() => {
         const domNode = chatParent.current
-        if (domNode) {
-            domNode.scrollTop = domNode.scrollHeight
-        }
     })
 
     const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -96,10 +94,6 @@ export function Chat() {
                 { label: 'Any potential sensitive information?', onClick: () => {setInput('Any potential sensitive information?'), setSuggestions(true)} }], 
           }]);
           setPdfMode(true);
-          if (res.data.access_token) {
-            const new_token = res.data.access_token
-            setToken(new_token)
-            }
           event.target.value = ''; // clear the input after uploading
 
         } catch (error) {
@@ -107,6 +101,7 @@ export function Chat() {
         }
         
     };
+
 
     /* randomly select a message */
     const messages = [
@@ -180,7 +175,9 @@ export function Chat() {
                 }]);
             } else if (tempInput === 'What is the document about?') {
                 setResponse((prevMessages) => [...prevMessages, { sender: 'bot', text: "You may find the following suggestions helpful.",
-                    buttons: [{ label: 'How many tables and images in the document?', onClick: () => {setInput('How many tables and images in the document?'), setSuggestions(true)} }],
+                    buttons: [{ label: 'Describe all images and figures in the document', onClick: () => {setInput('Describe all images and figures in the document'), setSuggestions(true)}},
+                    { label: 'Describe all tables in the document', onClick: () => {setInput('Describe all tables in the document'), setSuggestions(true)} },
+                    { label: 'Summarise each section of the document', onClick: () => {setInput('Summarise each section of the document'), setSuggestions(true)} }]
                 }]);
             } else if (tempInput === 'What is the document implication for conducting a DPIA?') {
                 setResponse((prevMessages) => [...prevMessages, { sender: 'bot', text: "You may find the following suggestions helpful.",
@@ -190,10 +187,6 @@ export function Chat() {
                 setResponse((prevMessages) => [...prevMessages, { sender: 'bot', text: getRandomMessage() }]);
             }
 
-            if (res.data.access_token) {
-                const new_token = res.data.access_token
-                setToken(new_token)
-            }
         } catch (error) {
             console.error('Error:', error);
             const errorMessage: Message = { sender: 'bot', text: 'An error occurred while fetching the response.' };
@@ -256,10 +249,7 @@ export function Chat() {
                     }
                 }
             );
-            if (res.data.access_token) {
-                const new_token = res.data.access_token
-                setToken(new_token)
-            }
+
         } catch (error) {
             console.error('Error:', error);
             const errorMessage: Message = { sender: 'bot', text: ' An error occurred while clearing the chat.' };
@@ -344,3 +334,5 @@ export function Chat() {
         </main>
     )
 }
+
+export default Chat;

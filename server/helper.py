@@ -1,12 +1,11 @@
-import os, uuid, glob
+import os, uuid, glob, shutil
 from unstructured.partition.pdf import partition_pdf
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts import ChatPromptTemplate
-import ollama, shutil
 from langchain_core.documents import Document
 from pydantic import BaseModel
 from typing import Any
-from langchain_community.vectorstores import Chroma
+from langchain_chroma import Chroma
 from langchain.retrievers.multi_vector import MultiVectorRetriever
 
 from reportlab.lib.pagesizes import A4
@@ -20,6 +19,7 @@ from langchain.retrievers import ParentDocumentRetriever
 
 from langchain.storage import LocalFileStore
 from langchain.storage._lc_store import create_kv_docstore
+from visionLLM import image_response
 
 
 def check_path(path):
@@ -76,10 +76,10 @@ def create_chatData(BASE_DIR, embeddings, msg):
     content = [Document(page_content=docs[0].page_content, metadata={"doc_id": "chatData"})]
 
     # This text splitter is used to create the parent documents
-    parent_splitter = RecursiveCharacterTextSplitter(chunk_size=2000)
+    parent_splitter = RecursiveCharacterTextSplitter(chunk_size=2500, chunk_overlap=100)
     # This text splitter is used to create the child documents
     # It should create documents smaller than the parent
-    child_splitter = RecursiveCharacterTextSplitter(chunk_size=400)
+    child_splitter = RecursiveCharacterTextSplitter(chunk_size=500, chunk_overlap=50)
     # The vectorstore to use to index the child chunks
     vectorstore = Chroma(
         collection_name="chatData", embedding_function=embeddings, persist_directory=BASE_DIR + "/chatData/"
@@ -97,15 +97,14 @@ def create_chatData(BASE_DIR, embeddings, msg):
         id_key="doc_id",
         child_splitter=child_splitter,
         parent_splitter=parent_splitter,
-        search_kwargs={'k': 8}
+        search_kwargs={'k': 10}
     )
     if len(existing_documents) == 0:
         retriever.add_documents(content)
         retriever.docstore.mset(list(zip("chatData", content)))
 
     context = retriever.invoke(msg)
-    page_content = [doc.page_content for doc in context]
-    return page_content
+    return context
 
 
 def chat_dict(chatMessage):
@@ -130,7 +129,12 @@ def partition_process(UP_DIR, user_id, project_id, filenames, IMG_DIR_C, IMG_DIR
         vectorstore = Chroma(collection_name=f"summary_{user_id}", embedding_function=embeddings, persist_directory=BASE_DIR + "/vectorDB/")
 
         print('TEST', filenames)
-        doc_filter = [{'file_name': f} for f in filenames]  
+        if mode == "chat":
+            doc_filter = {'file_name': filenames[0]}
+        elif mode != "chat" and len(filenames) == 1:
+            doc_filter = {'file_name': filenames[0] + '.pdf'}
+        else:
+            doc_filter = {"$or": [{'file_name': f + '.pdf'} for f in filenames]}  
 
         for filename in filenames:
 
@@ -147,9 +151,10 @@ def partition_process(UP_DIR, user_id, project_id, filenames, IMG_DIR_C, IMG_DIR
                     file_name=file_name,
                     embed_type=embed_type,
                     usage=usage,
-                    search_kwargs={'k': 8, 'filter': filter},
+                    search_kwargs={'k': 20, 'filter': filter},
                 )
             else:
+                filename = filename + ".pdf"
                 existing_documents = vectorstore.get(where={
                     "$and": [
                         {"file_name": filename},
@@ -167,9 +172,9 @@ def partition_process(UP_DIR, user_id, project_id, filenames, IMG_DIR_C, IMG_DIR
                     file_name=file_name,
                     embed_type=embed_type,
                     usage=usage,
-                    search_kwargs={'k': 8, 'filter': {
+                    search_kwargs={'k': 20, 'filter': {
                         "$and": [
-                            {"$or": doc_filter },
+                            doc_filter,
                             {"usage": f"project_{project_id}"}
                         ]
                     }},
@@ -179,7 +184,7 @@ def partition_process(UP_DIR, user_id, project_id, filenames, IMG_DIR_C, IMG_DIR
 
                 # Get PDF elements
                 pdf_elements = partition_pdf(
-                filename=os.path.join(UP_DIR, filename),
+                filename=os.path.join(UP_DIR, filename), 
                 # Using pdf format to find embedded image blocks
                 extract_images_in_pdf=True,
                 # Use layout model (YOLOX) to get bounding boxes (for tables) and find titles
@@ -194,6 +199,7 @@ def partition_process(UP_DIR, user_id, project_id, filenames, IMG_DIR_C, IMG_DIR
                 max_characters=4000,
                 new_after_n_chars=3800,
                 combine_text_under_n_chars=2000,
+                overlap=200,
                 extract_image_block_output_dir=IMG_DIR_C
                 )
                 
@@ -231,46 +237,32 @@ def partition_process(UP_DIR, user_id, project_id, filenames, IMG_DIR_C, IMG_DIR
 
                 # Apply to text
                 texts = [i.text for i in text_elements]
-                text_summary = summary_chain.batch(texts, {"max_concurrency": 5})
+                text_summary = summary_chain.batch(texts, {"max_concurrency": 20})
                 # Apply to tables
                 tables = [i.text for i in table_elements]
-                table_summary = summary_chain.batch(tables, {"max_concurrency": 5})
+                table_summary = summary_chain.batch(tables, {"max_concurrency": 20})
 
                 # Loop through each image in the directory
+                img_summary = []
                 img_name = ""
-                for img in os.listdir(IMG_DIR_C):
-                    if img.endswith(".jpg"):
-                        # Extract the base name of the image without extension
-                        img_name = os.path.splitext(img)[0]
-                
-                    # Prepare the message to send to the LLaVA model
-                    message = {
-                        'role': 'user',
-                        'content': 'Describe the image in detail. Be specific about graphs, such as bar plots.',
-                        'images': [IMG_DIR_C + '/' + img_name + '.jpg']
-                    }
+                for img_name in os.listdir(IMG_DIR_C):
 
-                    # Use the ollama.chat function to send the image and retrieve the description
-                    description = ollama.chat(
-                        model="llava",  
-                        messages=[message]
-                    )
-
+                    description = image_response(IMG_DIR_C, img_name)
                     # Path to the text file to save the description
                     text_file_path = os.path.join(IMG_DIR_CD, f"{img_name}.txt")
                     check_path(IMG_DIR_CD)
                     # Write the description to the text file
                     with open(text_file_path, 'w') as text_file:
-                        text_file.write(description['message']['content'])
+                        text_file.write(description)
 
                 # Get all .txt file summaries
                 file_paths = glob.glob(os.path.expanduser(os.path.join(IMG_DIR_CD, "*.txt")))
 
                 # Read each file and store its content in a list
-                img_summary = []
                 for file_path in file_paths:
                     with open(file_path, "r") as file:
                         img_summary.append(file.read())
+                
 
                 # Add texts
                 if texts:
@@ -312,6 +304,7 @@ def partition_process(UP_DIR, user_id, project_id, filenames, IMG_DIR_C, IMG_DIR
                     else:
                         print(f"Directory does not exist: {directory_path}")
         return retriever
+
 
 # constructing a pdf from text
 class DPIAPDFGenerator:

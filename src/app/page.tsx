@@ -1,11 +1,11 @@
 'use client';
 
-import { useEffect } from 'react';
-import { Chat } from "./components/chat";
-import { Project } from "./components/project";
-import { Template } from "./components/temp";
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import Chat from "./components/chat";
+import Project from "./components/project";
+import Template from "./components/temp";
 import { Button } from "@mui/material";
+import Metric from './components/metric';
 import  Login  from "./auth/login";
 import  Register  from "./auth/register";
 import axios from 'axios';
@@ -22,6 +22,7 @@ export default function Page() {
   const [login, setLogin] = useState(false);
   const [email, setEmail] = useState<string>('');
 
+
   const handleRegister = () => {
     setLogin(true);
   }
@@ -31,8 +32,20 @@ export default function Page() {
     if (savedEmail) {
       setEmail(savedEmail);
     }
-  }, []);
-  
+
+    // Check if the token exists before setting up the interval
+    if (token) {
+      // Set up the interval to call refreshToken every 30 minutes
+      const intervalId = setInterval(() => {
+        refreshToken();
+      }, 30 * 60 * 1000); // 30 minutes in milliseconds
+
+      // Cleanup the interval on component unmount
+      return () => clearInterval(intervalId);
+    }
+  }, [token]);
+
+
   if (!token && !login)  {
     return (
       <div className="h-16 bg-gradient-to-r from-purple-500 to-pink-500">
@@ -53,13 +66,25 @@ export default function Page() {
       <div className="h-16 bg-gradient-to-r from-purple-500 to-pink-500">
       <div style={{ display: 'flex', height: '100vh', justifyContent: 'center', alignItems: 'center' }}>
         <div>
-          
         <Register setLogin={setLogin} />
         </div>
       </div>
       </div>
     )
   }
+
+  const refreshToken = async () => {
+    
+    const res = await axios.get('http://localhost:8080/refresh_token',{
+      headers: {
+        'Authorization': `Bearer ${token}`,
+      },
+    });
+    if (res.data.access_token) {
+      setToken(res.data.access_token);
+    }
+  }
+
 
   const handleLogout = async () => {
     const res = await axios.post('http://localhost:8080/logout');
@@ -85,6 +110,8 @@ export default function Page() {
                       color: selectedComponent === 'temp' ? 'white' : 'black' }} variant="outlined"><h1 className="text-1xl font-bold ">Template</h1></Button>
           <Button color='secondary' onClick={() => setSelectedComponent('project') } style={{backgroundColor: selectedComponent === 'project' ? '#1c5b99' : 'transparent',
                       color: selectedComponent === 'project' ? 'white' : 'black' }}variant="outlined"><h1 className="text-1xl font-bold ">Project</h1></Button>
+          <div style={{ flexGrow: 1 }}></div>
+          <Metric token={token} /> 
           <div style={{ flexGrow: 1 }}></div> 
           <h1 className="text-1xl font-bold " >WELCOME:  <span style={{ marginLeft: '5px' }}>{email}</span></h1>
           <Button onClick={handleLogout} color='secondary' variant="contained" style={{marginTop:'10px'}}>Logout</Button>
@@ -93,13 +120,13 @@ export default function Page() {
 
       <div style={{ flex: 1, padding: '10px' }}>
         <div style={{ display: selectedComponent === 'chat' ? 'block' : 'none' }}>
-          <Chat />
+          <Chat token={token}/>
         </div>
         <div style={{ display: selectedComponent === 'temp' ? 'block' : 'none' }}>
-          <Template />
+          <Template token={token}/>
         </div>
         <div style={{ display: selectedComponent === 'project' ? 'block' : 'none' }}>
-          <Project />
+          <Project token={token} />
         </div>
       </div>
       </div>

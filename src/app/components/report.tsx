@@ -6,7 +6,6 @@ import { useEffect, useState } from 'react'
 import axios from 'axios';
 import { pdfjs } from 'react-pdf';
 import PDFView from "./view";
-import useToken from "../auth/token";
 import { Dpia } from "./dpia";
 import Snackbar, { SnackbarOrigin } from '@mui/material/Snackbar';
 import { styled } from '@mui/material/styles';
@@ -28,6 +27,7 @@ import React from 'react';
 
 
 interface ReportProps {
+  token: string | null;
   projectID: number;
   title: string;
   description: string;
@@ -69,9 +69,7 @@ export function Report(props: ReportProps) {
     const projectID = props.projectID;
     const title = props.title;
     const description = props.description;
-    const { token, removeToken, setToken } = useToken();
-
-
+    const token = props.token;
 
     const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
         
@@ -115,10 +113,7 @@ export function Report(props: ReportProps) {
                 });
                 setUploadMessage(`File(s) uploaded successfully`);
                 fetchDocuments(); // Refresh the document list
-                if (res.data.access_token) {
-                    const new_token = res.data.access_token
-                    setToken(new_token)
-                }
+
                 event.target.value = ''; // clear the input after uploading
             } else {
                 setUploadMessage(`Error uploading file`);
@@ -159,12 +154,7 @@ export function Report(props: ReportProps) {
                 'Authorization': `Bearer ${token}`
             }
         });
-
             setDocuments(res.data);
-            if (res.data.access_token) {
-                const new_token = res.data.access_token
-                setToken(new_token)
-            }
         } catch (error) {
             console.error('Error fetching documents:', error);
         }
@@ -180,10 +170,6 @@ export function Report(props: ReportProps) {
             });
             fetchDocuments(); // Refresh the document list
             setSelectedDocs([]); // Clear the selected documents
-            if (res.data.access_token) {
-                const new_token = res.data.access_token
-                setToken(new_token)
-            }
         } catch (error) {
             console.error('Error deleting documents:', error);
         }
@@ -202,12 +188,6 @@ export function Report(props: ReportProps) {
         });
         const url = window.URL.createObjectURL(new Blob([res.data]));
         setSelectedDoc(url);
-
-        if (res.data.access_token) {
-            const new_token = res.data.access_token
-            setToken(new_token)
-        }
-
     };
 
     const handleClose = () => {
@@ -250,7 +230,7 @@ export function Report(props: ReportProps) {
 
     return (
         <main className="flex flex-col w-full h-screen max-h-dvh bg-background">
-            <Box bgcolor="#ededed" p={0.5} borderRadius={1} style={{ marginTop: '20px'}}>
+            <Box bgcolor="#ededed" p={0.5} borderRadius={1} style={{ marginTop: '15px'}}>
                 <header className="p-4 border-b w-full max-w-3xl mx-auto">
                     <h1 className="text-2xl font-bold">Project: {title}</h1>
                     <h2>{description}</h2>
@@ -261,102 +241,102 @@ export function Report(props: ReportProps) {
                      color: activeTab === 'reports' ? 'white' : 'black' }}></Tab>
             </Box>
 
-            <section className="p-4 flex-1 overflow-auto">
-                {activeTab === 'files' ? (
+            <div className="p-4">
+            {activeTab === 'files' ? (
+                <div>
+                    <Button
+                        component="label"
+                        variant="contained"
+                        color="success"
+                        tabIndex={-1}
+                        startIcon={<CloudUploadIcon />}
+                    >
+                        Upload
+                        <VisuallyHiddenInput type="file" multiple onChange={handleFileChange} accept=".txt,.docx,.pdf" />
+                    </Button>
+                    <Box sx={{ width: 500 }}>
+                    <Snackbar
+                        anchorOrigin={{ vertical, horizontal }}
+                        autoHideDuration={1000}
+                        open={uploadMessage !== ''}
+                        onClose={() => setUploadMessage('')}
+                        message="File(s) uploaded successfully."
+                        key={vertical + horizontal}
+                    />
+                    </Box>
+
+                    <Box bgcolor="#e0e0e0" p={3} borderRadius={4} style={{ marginTop: '20px' }}>
+                    <TextField
+                        label="Search"
+                        color="primary"
+                        variant="outlined"
+                        value={searchQuery}
+                        onChange={handleSearchChange}
+                        fullWidth
+                        style={{ margin: '15px 0', }}
+                    />
+
+                    {filteredDocuments.length > 0 && (
                     <div>
-                        <Button
-                            component="label"
-                            variant="contained"
-                            color="success"
-                            tabIndex={-1}
-                            startIcon={<CloudUploadIcon />}
-                            style={{marginLeft: '10px', marginRight: '15px'}}
-                        >
-                            Upload
-                            <VisuallyHiddenInput type="file" multiple onChange={handleFileChange} accept=".txt,.docx,.pdf" />
-                        </Button>
-                        <Box sx={{ width: 500 }}>
-                        <Snackbar
-                            anchorOrigin={{ vertical, horizontal }}
-                            autoHideDuration={1000}
-                            open={uploadMessage !== ''}
-                            onClose={() => setUploadMessage('')}
-                            message="File(s) uploaded successfully."
-                            key={vertical + horizontal}
-                        />
-                        </Box>
-
-                        <Box bgcolor="#e0e0e0" p={3} borderRadius={4} style={{ marginTop: '20px' }}>
-                        <TextField
-                            label="Search"
-                            color="primary"
-                            variant="outlined"
-                            value={searchQuery}
-                            onChange={handleSearchChange}
-                            fullWidth
-                            style={{ margin: '15px 0', }}
-                        />
-
-                        {filteredDocuments.length > 0 && (
-                        <div>
-                        <Button onClick={handleSelectAll} variant="contained" color="secondary" >
-                            {selectedDocs.length === filteredDocuments.length ? 'Deselect All' : 'Select All'}
-                        </Button>
-                        <Button onClick={handleSelectDpiaAll} variant="contained" color="secondary" style={{ marginLeft: '20px' }}>
-                            {selectedDpiaDocs.length === filteredDocuments.length ? 'Deselect All Dpia Files' : 'Select All Dpia Files'}
-                        </Button>
-                        {selectedDocs.length > 0 && (
-                        <Button variant="contained" color="secondary" onClick={handleFileDelete} style={{ marginLeft: '20px' }}>
-                            Delete
-                        </Button>
-                        )}
-                        </div>
-                        )}
-                        
-                        <Grid container spacing={2}>
-                            <Grid item xs={12}>
-                            
-                            <List>
-                                {filteredDocuments.map(doc => (
-                                    <ListItem key={doc.fileID} className="flex justify-between items-center"
-                                        style={{ backgroundColor: '#ffffff', // White background for each item
-                                            borderRadius: '4px', // Rounded corners for each item
-                                            boxShadow: '0px 3px 6px rgba(0, 0, 0, 0.1)', // Light shadow to make items stand out
-                                            display: 'flex',
-                                            justifyContent: 'space-between',
-                                            margin: '10px 0',
-                                            alignItems: 'center', }}
-                                    
-                                    >
-                                    <Checkbox
-                                        checked={selectedDocs.includes(doc.fileID)}
-                                        onChange={(event) => handleCheckboxChange(event, doc)}
-                                    />
-                                        <ListItemIcon>
-                                            <FolderIcon fontSize="large"/>
-                                        </ListItemIcon>
-                                        <ListItemText
-                                            primary={doc.fileName}
-                                        />
-                                    <Checkbox
-                                        checked={selectedDpiaDocs.includes(doc.fileID)}
-                                        onChange={(event) => dpiaCheckboxChange(event, doc)}
-                                    />
-                                        <div >
-                                            <Button onClick={() => handleView(doc.fileID, doc.fileName)} variant="contained" color="primary" style={{ marginRight: '10px' }}>View</Button>
-                                        </div>
-                                    </ListItem>
-                                ))}
-                            </List>
-                            </Grid>
-                        </Grid>
-                        </Box>
+                    <Button onClick={handleSelectAll} variant="contained" color="secondary" >
+                        {selectedDocs.length === filteredDocuments.length ? 'Deselect All' : 'Select All'}
+                    </Button>
+                    <Button onClick={handleSelectDpiaAll} variant="contained" color="secondary" style={{ marginLeft: '20px' }}>
+                        {selectedDpiaDocs.length === filteredDocuments.length ? 'Deselect All Dpia Files' : 'Select All Dpia Files'}
+                    </Button>
+                    {selectedDocs.length > 0 && (
+                    <Button variant="contained" color="secondary" onClick={handleFileDelete} style={{ marginLeft: '20px' }}>
+                        Delete
+                    </Button>
+                    )}
                     </div>
+                    )}
                     
-                ) : (
-                    <Dpia projectID={projectID} dpiaFileNames={selectedDpiaDocName}/>
-                )}
-            </section>
+                    <Grid container spacing={2}>
+                        <Grid item xs={12}>
+                        
+                        <List>
+                            {filteredDocuments.map(doc => (
+                                <ListItem key={doc.fileID} className="flex justify-between items-center"
+                                    style={{ backgroundColor: '#ffffff', // White background for each item
+                                        borderRadius: '4px', // Rounded corners for each item
+                                        boxShadow: '0px 3px 6px rgba(0, 0, 0, 0.1)', // Light shadow to make items stand out
+                                        display: 'flex',
+                                        justifyContent: 'space-between',
+                                        margin: '10px 0',
+                                        alignItems: 'center', }}
+                                
+                                >
+                                <Checkbox
+                                    checked={selectedDocs.includes(doc.fileID)}
+                                    onChange={(event) => handleCheckboxChange(event, doc)}
+                                />
+                                    <ListItemIcon>
+                                        <FolderIcon fontSize="large"/>
+                                    </ListItemIcon>
+                                    <ListItemText
+                                        primary={doc.fileName}
+                                    />
+                                <Checkbox
+                                    checked={selectedDpiaDocs.includes(doc.fileID)}
+                                    onChange={(event) => dpiaCheckboxChange(event, doc)}
+                                />
+                                    <div >
+                                        <Button onClick={() => handleView(doc.fileID, doc.fileName)} variant="contained" color="primary" style={{ marginRight: '10px' }}>View</Button>
+                                    </div>
+                                </ListItem>
+                            ))}
+                        </List>
+                        </Grid>
+                    </Grid>
+                    </Box>
+                </div>
+                
+            ) : (
+                <Dpia token={token} projectID={projectID} dpiaFileNames={selectedDpiaDocName} status={""}/>
+            )}
+            </div>
+
             <Dialog open={open} onClose={handleClose}  fullWidth maxWidth="lg">
                 <DialogTitle>{selectedDocName}</DialogTitle>
                 <DialogContent>
@@ -370,5 +350,4 @@ export function Report(props: ReportProps) {
             </Dialog>
         </main>
     );
-
 }

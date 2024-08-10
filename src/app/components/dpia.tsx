@@ -5,7 +5,6 @@ import { useEffect, useState } from 'react'
 import axios from 'axios';
 import { pdfjs, Document, Page } from 'react-pdf';
 import PDFView from "./view";
-import useToken from "../auth/token";
 
 import List from '@mui/material/List';
 import ListItem from '@mui/material/ListItem';
@@ -24,8 +23,10 @@ import React from 'react';
 
 
 interface DpiaProps {
+  token: string | null;
   projectID: number;
   dpiaFileNames: string[];
+  status: string;
 }
 
 export function Dpia(props: DpiaProps) {
@@ -34,16 +35,16 @@ export function Dpia(props: DpiaProps) {
     const [open, setOpen] = useState(false);
     const [selectedDoc, setSelectedDoc] = useState<string | null>(null);
     const [selectedDocName, setSelectedDocName] = useState<string | null>('');
+    const [generating, setGenerating] = useState<boolean>(false);
 
-    const [dpias, setDpias] = useState<{ dpiaID: number; title: string; }[]>([]);
+    const [dpias, setDpias] = useState<{ dpiaID: number; title: string; status: string }[]>([]);
     const [selectedDocs, setSelectedDocs] = useState<number[]>([]);
     const [selectedNames, setSelectedNames] = useState<string[]>([]);
+    const [selectedStatus, setSelectedStatus] = useState<string[]>([]);
     const [searchQuery, setSearchQuery] = useState<string>('');
 
     const [openGenerate, setOpenGenerate] = useState<boolean>(false);
     const [dpiaTitle, setDpiaTitle] = useState<string>('');
-
-    const [working, setWorking] = useState<boolean>(false);
 
     const filteredDpias = dpias.filter(doc =>
         doc.title.toLowerCase().includes(searchQuery.toLowerCase())
@@ -51,16 +52,17 @@ export function Dpia(props: DpiaProps) {
 
     const projectID = props.projectID;
     const dpiaFileNames = props.dpiaFileNames;
-    const { token, removeToken, setToken } = useToken();
-
+    const token = props.token;
 
     const handleSelectAll = () => {
         if (selectedDocs.length === filteredDpias.length) {
           setSelectedDocs([]);
           setSelectedNames([]);
+          setSelectedStatus([]);
         } else {
           setSelectedDocs(filteredDpias.map(doc => doc.dpiaID));
           setSelectedNames(filteredDpias.map(doc => doc.title));
+          setSelectedStatus(filteredDpias.map(doc => doc.status));
         }
       };
       
@@ -90,6 +92,7 @@ export function Dpia(props: DpiaProps) {
             
             try {
                 setOpenGenerate(false);
+                setGenerating(true);
                 const res = await axios.post('http://localhost:8080/generate_dpia', {
                     projectID: projectID,
                     title: dpiaTitle,
@@ -100,12 +103,9 @@ export function Dpia(props: DpiaProps) {
                         'Authorization': `Bearer ${token}`
                     }
                 });
-                setWorking(false);
                 fetchDpias();
-                if (res.data.access_token) {
-                    const new_token = res.data.access_token
-                    setToken(new_token)
-                }
+                setGenerating(false);
+
             } catch (error) {
                 console.error('Error starting DPIA:', error);
             }
@@ -128,15 +128,7 @@ export function Dpia(props: DpiaProps) {
         });
 
             const status = res.data[0] && res.data[0].status;
-            if (status === 'working') {
-                setWorking(true);
-            }
-
             setDpias(res.data);
-            if (res.data.access_token) {
-                const new_token = res.data.access_token
-                setToken(new_token)
-            }
         } catch (error) {
             console.error('Error fetching documents:', error);
         }
@@ -152,11 +144,8 @@ export function Dpia(props: DpiaProps) {
             });
             fetchDpias(); // Refresh the document list
             setSelectedDocs([]); // Clear the selected documents
+            setGenerating(false);
 
-            if (res.data.access_token) {
-                const new_token = res.data.access_token
-                setToken(new_token)
-            }
         } catch (error) {
             console.error('Error deleting documents:', error);
         }
@@ -175,11 +164,6 @@ export function Dpia(props: DpiaProps) {
         const url = window.URL.createObjectURL(new Blob([res.data]));
         setSelectedDoc(url);
 
-        if (res.data.access_token) {
-            const new_token = res.data.access_token
-            setToken(new_token)
-        }
-
     };
 
     const handleClose = () => {
@@ -187,13 +171,15 @@ export function Dpia(props: DpiaProps) {
     };
 
 
-    const handleCheckboxChange = (event: React.ChangeEvent<HTMLInputElement>, doc: { dpiaID: number; title: string; }) => {
+    const handleCheckboxChange = (event: React.ChangeEvent<HTMLInputElement>, doc: { dpiaID: number; title: string; status: string }) => {
         if (event.target.checked) {
             setSelectedDocs([...selectedDocs, doc.dpiaID]);
             setSelectedNames([...selectedNames, doc.title]);
+            setSelectedStatus([...selectedStatus, doc.status]);
         } else {
             setSelectedDocs(selectedDocs.filter(id => id !== doc.dpiaID));
             setSelectedNames(selectedNames.filter(name => name !== doc.title));
+            setSelectedStatus(selectedStatus.filter(status => status !== doc.status));
         }
     };
 
@@ -223,85 +209,82 @@ export function Dpia(props: DpiaProps) {
         setSearchQuery(event.target.value);
     };
 
-
-
     return (
         <main className="flex flex-col w-full h-screen max-h-dvh bg-background">
 
-            <section className="p-4 flex-1 overflow-auto" >
-                    <div>
-                        <Button onClick={handleGenerate} variant="contained" color="success" >Generate</Button>
+            <div>
+                <Button onClick={handleGenerate} variant="contained" color="success" disabled={generating}>Generate</Button>
 
-                        <Box bgcolor="#e0e0e0" p={3} borderRadius={4} style={{ marginTop: '20px' }}>
-                        <TextField
-                            label="Search"
-                            color="primary"
-                            variant="outlined"
-                            value={searchQuery}
-                            onChange={handleSearchChange}
-                            fullWidth
-                            style={{ margin: '15px 0', }}
-                        />
+                <Box bgcolor="#e0e0e0" p={3} borderRadius={4} style={{ marginTop: '20px' }}>
+                <TextField
+                    label="Search"
+                    color="primary"
+                    variant="outlined"
+                    value={searchQuery}
+                    onChange={handleSearchChange}
+                    fullWidth
+                    style={{ margin: '15px 0', }}
+                />
 
-                        {filteredDpias.length > 0 && (
-                        <div>
-                        <Button onClick={handleSelectAll} variant="contained" color="secondary">
-                            {selectedDocs.length === filteredDpias.length ? 'Deselect All' : 'Select All'}
-                        </Button>
-                        {selectedDocs.length > 0 && (
-                        <Button variant="contained" color="secondary" onClick={handleDpiaDelete} style={{ marginLeft: '20px' }}>
-                            Delete
-                        </Button>
-                        )}
-                        {selectedDocs.length > 0 && !working && (
-                        <Button variant="contained" color="primary" onClick={handleDownload} style={{ marginLeft: '20px' }}>
-                            Download
-                        </Button>
-                        )}
-                        </div>
-                        )}
-                        <Grid container spacing={2}>
-                            <Grid item xs={12}>
-                            
-                            <List>
-                                {filteredDpias.map(doc => (
-                                    <ListItem key={doc.dpiaID} className="flex justify-between items-center"
-                                        style={{ backgroundColor: '#ffffff', // White background for each item
-                                            borderRadius: '4px', // Rounded corners for each item
-                                            boxShadow: '0px 3px 6px rgba(0, 0, 0, 0.1)', // Light shadow to make items stand out
-                                            display: 'flex',
-                                            justifyContent: 'space-between',
-                                            margin: '10px 0',
-                                            alignItems: 'center', }}
-                                    >
-                                    <Checkbox
-                                        checked={selectedDocs.includes(doc.dpiaID) && selectedNames.includes(doc.title)}
-                                        onChange={(event) => handleCheckboxChange(event, doc)}
-                                    />
-                                        <ListItemIcon>
-                                            <AssignmentIcon fontSize="large"/>
-                                        </ListItemIcon>
-                                        <ListItemText
-                                            primary={doc.title}
-                                        />
-                                        {working && (
-                                            <img src='/loading-gif.gif' alt="GIF" style={{width:'30px', height:'30px', marginRight: '15px'}}/>
-                                        )}
-                                        <div >
-                                            {working ? (
-                                                <h1>Processing, please wait...</h1>
-                                            ) : (
-                                                <Button onClick={() => handleView(doc.dpiaID, doc.title)} variant="contained" color="primary" style={{ marginRight: '10px' }}>View</Button>
-                                            )}
-                                        </div>
-                                    </ListItem>
-                                ))}
-                            </List>
-                            </Grid>
-                        </Grid>
-                        </Box>
-                    </div>
-            </section>
+                {filteredDpias.length > 0 && (
+                <div>
+                <Button onClick={handleSelectAll} variant="contained" color="secondary">
+                    {selectedDocs.length === filteredDpias.length ? 'Deselect All' : 'Select All'}
+                </Button>
+                {selectedDocs.length > 0 && (
+                <Button variant="contained" color="secondary" onClick={handleDpiaDelete} style={{ marginLeft: '20px' }}>
+                    Delete
+                </Button>
+                )}
+                {selectedDocs.length > 0 && selectedStatus.every(status => status == 'completed') && (
+                <Button variant="contained" color="primary" onClick={handleDownload} style={{ marginLeft: '20px' }}>
+                    Download
+                </Button>
+                )}
+                </div>
+                )}
+                <Grid container spacing={2}>
+                    <Grid item xs={12}>
+                    
+                    <List>
+                        {filteredDpias.map(doc => (
+                            <ListItem key={doc.dpiaID} className="flex justify-between items-center"
+                                style={{ backgroundColor: '#ffffff', // White background for each item
+                                    borderRadius: '4px', // Rounded corners for each item
+                                    boxShadow: '0px 3px 6px rgba(0, 0, 0, 0.1)', // Light shadow to make items stand out
+                                    display: 'flex',
+                                    justifyContent: 'space-between',
+                                    margin: '10px 0',
+                                    alignItems: 'center', }}
+                            >
+                            <Checkbox
+                                checked={selectedDocs.includes(doc.dpiaID) && selectedNames.includes(doc.title) && selectedStatus.includes(doc.status)}
+                                onChange={(event) => handleCheckboxChange(event, doc)}
+                            />
+                                <ListItemIcon>
+                                    <AssignmentIcon fontSize="large"/>
+                                </ListItemIcon>
+                                <ListItemText
+                                    primary={doc.title}
+                                />
+                                {doc.status == 'working' && (
+                                    <img src='/loading-gif.gif' alt="GIF" style={{width:'30px', height:'30px', marginRight: '15px'}}/>
+                                )}
+                                <div >
+                                    {doc.status == 'working' ? (
+                                        <h1>Processing, please wait...</h1>
+                                    ) : (
+                                        <Button onClick={() => handleView(doc.dpiaID, doc.title)} variant="contained" color="primary" style={{ marginRight: '10px' }}>View</Button>
+                                    )}
+                                </div>
+                            </ListItem>
+                        ))}
+                    </List>
+                    </Grid>
+                </Grid>
+                </Box>
+            </div>
+
             <Dialog open={open} onClose={handleClose}  fullWidth maxWidth="lg">
                 <DialogTitle>{selectedDocName}</DialogTitle>
                 <DialogContent>

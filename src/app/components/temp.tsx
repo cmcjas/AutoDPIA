@@ -4,25 +4,40 @@ import { Button, TextField, Dialog, DialogActions, DialogContent, DialogTitle, M
 import { useRef, useEffect, useState } from 'react'
 import axios from 'axios';
 import Select, { SelectChangeEvent } from '@mui/material/Select';
+import { styled } from '@mui/material/styles';
+import CloudUploadIcon from '@mui/icons-material/CloudUpload';
 
-import useToken from '../auth/token';
 
-export function Template() {
+const VisuallyHiddenInput = styled('input')({
+    clip: 'rect(0 0 0 0)',
+    clipPath: 'inset(50%)',
+    height: 1,
+    overflow: 'hidden',
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    whiteSpace: 'nowrap',
+    width: 1,
+  });
 
-    const [templates, setTemplates] = useState<{ tempName: string, tempData : string}[]>([]);
+interface TempProps {
+    token: string | null;
+}
+
+const Template: React.FC<TempProps> = ({ token }) => {
+
+    const [templates, setTemplates] = useState<{ userID: number, tempName: string, tempData : string}[]>([]);
     const [selectedTemplate, setSelectedTemplate] = useState<string>('');
     const [error, setError] = useState(false);
+    const [processing, setProcessing] = useState(false);
+    const [message, setMessage] = useState<string>('');
 
     const [open, setOpen] = useState(false);
     const [name, setName] = useState('');
-    const { token, removeToken, setToken } = useToken();
 
     const chatParent = useRef<HTMLUListElement>(null)
     useEffect(() => {
         const domNode = chatParent.current
-        if (domNode) {
-            domNode.scrollTop = domNode.scrollHeight
-        }
     })
 
     useEffect(() => {
@@ -34,35 +49,95 @@ export function Template() {
                 }
                 });
                 setTemplates(res.data);
-                if (res.data.access_token) {
-                    const new_token = res.data.access_token
-                    setToken(new_token)
-                }
             } catch (err) {
                 setError(error);
             }
             };
         fetchTemplates();
-    }, [error, open, token]);
+    }, [error, open, token, processing]);
 
     const handleSelectChange = (event: SelectChangeEvent<unknown>) => {
+        setMessage('');
         setSelectedTemplate(event.target.value as string);
     };
 
 
     const selectedTemplateData = templates.find(template => template.tempName === selectedTemplate)?.tempData??'';
+    const selectedTempUserID = templates.find(template => template.tempName === selectedTemplate)?.userID??'';
+
+    console.log(selectedTempUserID);
+
+    interface Prompt {
+        content: string;
+        from: {"Step": string, "Section": string};
+    }
     
-    let templateData: Record<string, Record<string, string>> = {};
-    templateData = {} as Record<string, Record<string, string>>;
+    let templateData: Record<string, Record<string, Prompt>> = {};
+    templateData = {} as Record<string, Record<string, Prompt>>;
 
     const [editableData, setEditableData] = useState(templateData);
     
     // Parse the JSON string to a JavaScript object
     if (selectedTemplateData === '') {
-        console.log('No template selected');
     } else {
         templateData = JSON.parse(selectedTemplateData);
     }
+
+    const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+        setMessage('');
+        let File
+        if (event.target.files && event.target.files[0]) {
+          File = event.target.files[0]
+        }
+
+        if (!File) {
+          alert('Please select a file first.');
+          return;
+        }
+
+        const formData = new FormData();
+        formData.append('File', File);
+        formData.append('Mode', 'template');
+
+        try {
+          setProcessing(true);
+          const res = await axios.post('http://localhost:8080/upload_doc', formData, {
+            headers: {
+              'Content-Type': 'multipart/form-data',
+              'Authorization': `Bearer ${token}`
+            }
+          });
+
+            if (res) {
+                formData.append('Filename', res.data['filename']);
+
+                try {
+                    const extract = await axios.post('http://localhost:8080/extract_template', formData, {
+                        headers : {
+                            'Content-Type': 'multipart/form-data',
+                            'Authorization': `Bearer ${token}`
+                        }
+                    });
+
+                    setMessage(extract.data.message);
+                    setProcessing(false);
+                    setSelectedTemplate(res.data.tempName);
+                } catch (error) {
+                    console.error('Error extracting template', error);
+                    setMessage('Not a valid DPIA template.');
+                    setProcessing(false);
+                }
+            } else {
+                console.error('Failed to upload file.');
+            }
+
+          event.target.value = ''; // clear the input after uploading
+
+        } catch (error) {
+          console.error('Error uploading file', error);
+        }
+        
+    };
 
     const saveTemplateData = async () => {
         try {
@@ -75,10 +150,6 @@ export function Template() {
             });
 
             if (res) {
-                if (res.data.access_token) {
-                    const new_token = res.data.access_token
-                    setToken(new_token)
-                }
                 console.log('Template data saved successfully.');
             } else {
                 console.error('Failed to save template data.');
@@ -122,13 +193,13 @@ export function Template() {
         ];
 
         // Create a new sections object with the new title inserted
-        const newSections: Record<string, string> = {};
+        const newSections: Record<string, Prompt> = {};
         newTitles.forEach((title) => {
             newSections[title] = updatedData[step][title] || '';
         });
 
         // Set the default prompt value for the new title
-        newSections[newTitle] = '';
+        newSections[newTitle] = { content: '', from: {"Step": "", "Section": ""} };
 
         // Update the step with the new sections
         updatedData[step] = newSections;
@@ -168,7 +239,7 @@ export function Template() {
         const stepKeys = Object.keys(updatedData);
     
         // Insert the new step and shift subsequent steps
-        const newUpdatedData: Record<string, Record<string, string>> = {};
+        const newUpdatedData: Record<string, Record<string, Prompt>> = {};
         let stepInserted = false;
     
         for (let i = 0; i < stepKeys.length; i++) {
@@ -180,7 +251,7 @@ export function Template() {
                 if (oldStepNumber === currentStepNumber && !stepInserted) {
                     // Insert the new step right after the current step
                     newUpdatedData[`Step ${oldStepNumber}${suffix}`] = updatedData[stepKeys[i]];
-                    newUpdatedData[`Step ${newStepNumber} - `] = { 'Role': '' };
+                    newUpdatedData[`Step ${newStepNumber} - `] = { 'Role': { content: '', from: {"Step": "", "Section": ""} }} ;
                     stepInserted = true;
                 } else if (oldStepNumber > currentStepNumber) {
                     // Shift the subsequent steps
@@ -193,7 +264,7 @@ export function Template() {
                 newUpdatedData[stepKeys[i]] = updatedData[stepKeys[i]];
                 if (stepKeys[i] === step && !stepInserted) {
                     // Insert the new step after the non-standard step
-                    newUpdatedData[`Step ${newStepNumber}`] = { 'Role': '' };
+                    newUpdatedData[`Step ${newStepNumber}`] = { 'Role': { content: '', from: {"Step": "", "Section": ""} } };
                     stepInserted = true;
                 }
             }
@@ -201,7 +272,7 @@ export function Template() {
     
         // If the new step was not inserted (in case the current step number is the highest or non-standard), add it at the end
         if (!stepInserted) {
-            newUpdatedData[`Step ${newStepNumber}`] = { 'Role': '' };
+            newUpdatedData[`Step ${newStepNumber}`] = { 'Role': { content: '', from: {"Step": "", "Section": ""} } };
         }
     
         // Update the state with the new data
@@ -222,8 +293,8 @@ export function Template() {
         delete updatedData[step];
     
         // Separate non-standard steps from standard 'Step X' steps
-        const nonStandardSteps: Record<string, Record<string, string>> = {};
-        const standardSteps: Record<string, Record<string, string>> = {};
+        const nonStandardSteps: Record<string, Record<string, Prompt>> = {};
+        const standardSteps: Record<string, Record<string, Prompt>> = {};
         const originalOrder: string[] = Object.keys(editableData);
     
         Object.keys(updatedData).forEach((key) => {
@@ -235,7 +306,7 @@ export function Template() {
         });
     
         // Reorder the remaining standard 'Step X' steps while keeping the suffix
-        const reorderedSteps: Record<string, Record<string, string>> = {};
+        const reorderedSteps: Record<string, Record<string, Prompt>> = {};
         let mainStepCounter = 1;
         let subStepCounters: Record<number, number> = {};
     
@@ -261,7 +332,7 @@ export function Template() {
         });
     
         // Merge reordered steps and non-standard steps back into the original order
-        const finalData: Record<string, Record<string, string>> = {};
+        const finalData: Record<string, Record<string, Prompt>> = {};
     
         originalOrder.forEach((key) => {
             if (nonStandardSteps[key]) {
@@ -339,14 +410,13 @@ export function Template() {
         handleCloseStep();
     }
 
-    const handlePromptChange = (step: string, title: string, newPrompt: string) => {
+    const handlePromptChange = (step: string, title: string, newPrompt: Prompt) => {
         setEditableData(prevData => {
             const newData = { ...prevData };
             newData[step][title] = newPrompt;
             return newData;
         });
     };
-
 
     const handleClickOpen = () => {
         setOpen(true);
@@ -371,10 +441,6 @@ export function Template() {
         });
     
         if (res) {
-            if (res.data.access_token) {
-                const new_token = res.data.access_token
-                setToken(new_token)
-            }
           // handle success
           handleClose();
         } else {
@@ -393,11 +459,6 @@ export function Template() {
         });
         if (res) {
             setError(false);
-            if (res.data.access_token) {
-                const new_token = res.data.access_token
-                setToken(new_token)
-            }
-
         }
       }
 
@@ -409,8 +470,7 @@ export function Template() {
                 <h1 className="text-3xl font-bold">TEMPLATE</h1>
             </header>
 
-            <section className="p-4 flex-1 overflow-auto" ref={chatParent}>
-            <div>
+            <div className="p-4">
                 <h1 className="text-1xl font-bold">Choose a Template</h1>
                 <Select value={selectedTemplate} label="Template" onChange={handleSelectChange}>
                     <MenuItem value="">None...</MenuItem>
@@ -421,9 +481,28 @@ export function Template() {
                     ))}
                 </Select>
 
+                <Button
+                    component="label"
+                    variant="contained"
+                    color="success"
+                    tabIndex={-1}
+                    startIcon={<CloudUploadIcon />}
+                    style={{marginLeft: '20px'}}
+                    disabled={processing}
+                >
+                    Template
+                    <VisuallyHiddenInput type="file" onChange={handleFileChange} accept=".txt,.docx,.pdf" />
+                    {processing && (
+                        <img src='/loading-gif.gif' alt="GIF" style={{ marginLeft:'20px', width:'30px', height:'30px', marginRight: '15px'}}/>
+                    )}
+                </Button>
+                <p>{message}</p>
+            </div>
+            <section className="p-4 flex-1 overflow-auto" ref={chatParent}>
+
                 {selectedTemplate && selectedTemplateData && (
                     <div>
-                    {Object.entries(editableData).map(([step, sections]) => (
+                    {Object.entries(editableData).map(([step, sections], stepIndex) => (
                     <div key={step}>
                         <Box bgcolor="#e0e0e0" p={3} borderRadius={4} style={{ marginTop: '20px' }}>
                         <Button
@@ -433,28 +512,54 @@ export function Template() {
                         >
                             {step}
                         </Button>
+                        <div style={{marginTop:"5px"}}>
                         <Button variant="outlined" onClick={() => handleAddStep(step)}>Add Step</Button>
                         <Button variant="outlined" onClick={() => handleDeleteStep(step)}>Delete Step</Button>
-                        {Object.entries(sections).map(([title, prompt], index) => (
+                        </div>
+                        {Object.entries(sections).map(([title, prompt], sectionIndex) => (
                         <div key={title} style={{ marginBottom: '1rem' }}>
                                 <Button
                                     variant="outlined"
                                     onClick={() => handleOpenTitle(step, title)}
                                     fullWidth
-                                    style={{ marginBottom: '0.5rem' }}
+                                    style={{ marginBottom: '0.5rem', marginTop: '0.5rem' }}
                                 >
                                     {title}
                                 </Button>
                                 <TextField
                                     label="Prompt"
-                                    value={prompt}
+                                    value={prompt.content}
                                     variant="outlined"
-                                    onChange={(e) => handlePromptChange(step, title, e.target.value)}
+                                    onChange={(e) => handlePromptChange(step, title, { ...prompt, content: e.target.value })}
                                     fullWidth
                                     multiline
                                 />
-                            <Button variant="outlined" onClick={() => handleAddPart(step, title)}>Add Part</Button>
-                            <Button variant="outlined" onClick={() => handleDeletePart(step, title)}>Delete Part</Button>
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: "5px" }}>
+                                <div>
+                                <Button variant="outlined" onClick={() => handleAddPart(step, title)}>Add Part</Button>
+                                <Button variant="outlined" onClick={() => handleDeletePart(step, title)}>Delete Part</Button>
+                                </div>
+                            {!(stepIndex === 0 && sectionIndex === 0) && (
+                                <div>
+                                <span style={{ marginRight: '1rem' }}>Input From:</span> 
+                                <TextField
+                                    label="Step"
+                                    value={prompt.from["Step"]}
+                                    variant="outlined"
+                                    size="small"
+                                    onChange={(e) => handlePromptChange(step, title, { ...prompt, from: {"Step": e.target.value, "Section": prompt.from["Section"]} })}
+                                />
+                                <TextField
+                                    label="Section"
+                                    value={prompt.from["Section"]}
+                                    variant="outlined"
+                                    size="small"
+                                    disabled={!prompt.from["Step"]}
+                                    onChange={(e) => handlePromptChange(step, title, { ...prompt, from: {"Step": prompt.from["Step"], "Section": e.target.value} })}
+                                />
+                                </div>
+                            )}
+                            </div>
                         </div>
                         ))}
                         </Box>
@@ -530,19 +635,21 @@ export function Template() {
                     ))}
                 </div>
                 )}
-            </div>
             {selectedTemplate && selectedTemplateData && (
             <div style={{marginTop:'15px'}}>
             <Button variant="contained" color="success" onClick={handleClickOpen}>
                 Save
             </Button>
-            <Button variant="outlined" onClick={handleDelete} color="secondary" style={{marginLeft: '10px'}}>
-                Delete
-            </Button>
+                {selectedTempUserID !== 0 && (
+                <Button variant="outlined" onClick={handleDelete} color="secondary" style={{marginLeft: '10px'}}>
+                    Delete
+                </Button>
+                )}
             </div>
             )}
             </section>
         </main>
     )
-
 }
+
+export default Template;

@@ -1,11 +1,9 @@
 'use client'
 
 import { Button, Dialog, DialogActions, DialogContent, DialogTitle, Box, Checkbox, TextField } from "@mui/material";
-import { Tab } from "@mui/material"
 import { useRef, useEffect, useState } from 'react'
 import axios from 'axios';
 import { Report } from "./report";
-import useToken from "../auth/token";
 
 import List from '@mui/material/List';
 import ListItem from '@mui/material/ListItem';
@@ -15,10 +13,11 @@ import DatasetIcon from '@mui/icons-material/Dataset';
 import Grid from '@mui/material/Grid';
 
 
+interface ProjProps {
+    token: string | null;
+}
 
-
-export function Project() {
-
+const Project: React.FC<ProjProps> = ({ token }) => {
 
     const [projects, setProjects] = useState<{ projectID: number; title: string; description: string }[]>([]);
     const [selectedPrjs, setSelectedPrjs] = useState<number[]>([]);
@@ -33,14 +32,9 @@ export function Project() {
     const [title, setTitle] = useState<string>('');
     const [description, setDescription] = useState<string>('');
 
-    const { token, removeToken, setToken } = useToken();
-
     const chatParent = useRef<HTMLUListElement>(null)
     useEffect(() => {
         const domNode = chatParent.current
-        if (domNode) {
-            domNode.scrollTop = domNode.scrollHeight
-        }
     })
 
     const filteredProjects = projects.filter(doc =>
@@ -70,10 +64,7 @@ export function Project() {
                 }
             );
             setProjects(res.data);
-            if (res.data.access_token) {
-                const new_token = res.data.access_token
-                setToken(new_token)
-            }
+
         } catch (error) {
             console.error('Error fetching documents:', error);
         }
@@ -89,10 +80,7 @@ export function Project() {
             });
             fetchProjects(); // Refresh the document list
             setSelectedPrjs([]); // Clear the selected documents
-            if (res.data.access_token) {
-                const new_token = res.data.access_token
-                setToken(new_token)
-            }
+
         } catch (error) {
             console.error('Error deleting documents:', error);
         }
@@ -135,10 +123,6 @@ export function Project() {
         });
 
         if (res) {
-            if (res.data.access_token) {
-                const new_token = res.data.access_token
-                setToken(new_token)
-            }
             setOpenDialog(false);
         } else {
             // Handle error
@@ -160,14 +144,14 @@ export function Project() {
             <header className="p-4 border-b w-full h-16 bg-gradient-to-r from-purple-500 to-pink-500">
                 <h1 className="text-3xl font-bold">PROJECT</h1>
             </header>
-            <section className="p-4 flex-1 overflow-auto" ref={chatParent}>
-
+            <div className="p-4">
                 {!showTabs ? (
                     <Button variant="contained" color="success" onClick={handleCreateProject}>Create Project</Button>
                 ) : (
                     <Button variant="contained" color="primary" onClick={() => setShowTabs(false)}>Back</Button>
                 )}
-                
+            </div>
+            <section className="p-4 flex-1 overflow-auto" ref={chatParent} >
                 {!showTabs ? ( 
                     <div>
                         <Box bgcolor="#e0e0e0" p={3} borderRadius={4} style={{ marginTop: '20px' }}>
@@ -230,7 +214,7 @@ export function Project() {
                         </Box>
                     </div> 
                 ) : (
-                    <Report projectID={projectID} title={title} description={description}/>
+                    <Report token={token} projectID={projectID} title={title} description={description}/>
                 )}      
             </section>
 
@@ -264,3 +248,5 @@ export function Project() {
     );
 
 }
+
+export default Project;
