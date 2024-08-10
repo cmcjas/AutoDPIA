@@ -1,10 +1,11 @@
 'use client'
 
-import { Button, Dialog, DialogActions, DialogContent, DialogTitle, Box, Checkbox, TextField } from "@mui/material";
+import { Button, Dialog, DialogActions, DialogContent, DialogTitle, Box, Checkbox, TextField, Tab } from "@mui/material";
 import { useEffect, useState } from 'react'
 import axios from 'axios';
 import { pdfjs, Document, Page } from 'react-pdf';
 import PDFView from "./view";
+import { Report } from "./report";
 
 import List from '@mui/material/List';
 import ListItem from '@mui/material/ListItem';
@@ -27,10 +28,14 @@ interface DpiaProps {
   projectID: number;
   dpiaFileNames: string[];
   status: string;
+  title: string;
+  description: string;
 }
 
 export function Dpia(props: DpiaProps) {
 
+    const [activeTab, setActiveTab] = useState('reports');
+    const [dpiaActiveTab, setDpiaActiveTab] = useState('reports');
 
     const [open, setOpen] = useState(false);
     const [selectedDoc, setSelectedDoc] = useState<string | null>(null);
@@ -53,6 +58,9 @@ export function Dpia(props: DpiaProps) {
     const projectID = props.projectID;
     const dpiaFileNames = props.dpiaFileNames;
     const token = props.token;
+    const title = props.title;
+    const description = props.description;
+    const status = props.status;
 
     const handleSelectAll = () => {
         if (selectedDocs.length === filteredDpias.length) {
@@ -212,12 +220,26 @@ export function Dpia(props: DpiaProps) {
     return (
         <main className="flex flex-col w-full h-screen max-h-dvh bg-background">
 
-            <div>
-                <Button onClick={handleGenerate} variant="contained" color="success" disabled={generating}>Generate</Button>
+            <div className="sticky top-0" style={{zIndex: 101}}>
+            <Box bgcolor="#ededed" borderRadius={2}>
+                {dpiaActiveTab === 'reports' && (
+                <>
+                <header className="p-4 border-b w-full max-w-3xl mx-auto">
+                    <h1 className="text-2xl font-bold">Project: {title}</h1>
+                    <h2>{description}</h2>
+                </header>
+                <Tab onClick={() => {setActiveTab('files'); setDpiaActiveTab('files')}} label='Files' style={{ backgroundColor: activeTab === 'files' ? '#1c1d1f' : 'transparent',
+                    color: activeTab === 'files' ? 'white' : 'black' }}></Tab>
+                <Tab onClick={() => {setActiveTab('reports'); setDpiaActiveTab('reports')}} label='Dpias' style={{ backgroundColor: activeTab === 'reports' ? '#1c1d1f' : 'transparent',
+                    color: activeTab === 'reports' ? 'white' : 'black' }}></Tab>   
+                </>
+                )} 
 
-                <Box bgcolor="#e0e0e0" p={3} borderRadius={4} style={{ marginTop: '20px' }}>
+
+                {activeTab === 'reports' && (
+                <Box className="p-4" bgcolor="#ededed"> 
                 <TextField
-                    label="Search"
+                    label="Search Dpias"
                     color="primary"
                     variant="outlined"
                     value={searchQuery}
@@ -226,64 +248,77 @@ export function Dpia(props: DpiaProps) {
                     style={{ margin: '15px 0', }}
                 />
 
-                {filteredDpias.length > 0 && (
-                <div>
-                <Button onClick={handleSelectAll} variant="contained" color="secondary">
-                    {selectedDocs.length === filteredDpias.length ? 'Deselect All' : 'Select All'}
-                </Button>
-                {selectedDocs.length > 0 && (
-                <Button variant="contained" color="secondary" onClick={handleDpiaDelete} style={{ marginLeft: '20px' }}>
-                    Delete
-                </Button>
+                    <Box display="flex" alignItems="center">
+                        <Button onClick={handleGenerate} variant="contained" color="success" disabled={generating}>Generate</Button>
+
+                        {filteredDpias.length > 0 && (
+                        <div>
+                        <Button onClick={handleSelectAll} variant="contained" color="secondary">
+                            {selectedDocs.length === filteredDpias.length ? 'Deselect All' : 'Select All'}
+                        </Button>
+                        {selectedDocs.length > 0 && (
+                        <Button variant="contained" color="secondary" onClick={handleDpiaDelete} style={{ marginLeft: '20px' }}>
+                            Delete
+                        </Button>
+                        )}
+                        {selectedDocs.length > 0 && selectedStatus.every(status => status == 'completed') && (
+                        <Button variant="contained" color="primary" onClick={handleDownload} style={{ marginLeft: '20px' }}>
+                            Download
+                        </Button>
+                        )}
+                        </div>
+                        )}
+                    </Box>
+                </Box>
                 )}
-                {selectedDocs.length > 0 && selectedStatus.every(status => status == 'completed') && (
-                <Button variant="contained" color="primary" onClick={handleDownload} style={{ marginLeft: '20px' }}>
-                    Download
-                </Button>
-                )}
+                </Box>
                 </div>
-                )}
-                <Grid container spacing={2}>
-                    <Grid item xs={12}>
-                    
+
+                {activeTab === 'reports' ? (
+                <div className="p-4">
+                <Grid item xs={12}>
                     <List>
-                        {filteredDpias.map(doc => (
-                            <ListItem key={doc.dpiaID} className="flex justify-between items-center"
-                                style={{ backgroundColor: '#ffffff', // White background for each item
-                                    borderRadius: '4px', // Rounded corners for each item
-                                    boxShadow: '0px 3px 6px rgba(0, 0, 0, 0.1)', // Light shadow to make items stand out
-                                    display: 'flex',
-                                    justifyContent: 'space-between',
-                                    margin: '10px 0',
-                                    alignItems: 'center', }}
-                            >
-                            <Checkbox
-                                checked={selectedDocs.includes(doc.dpiaID) && selectedNames.includes(doc.title) && selectedStatus.includes(doc.status)}
-                                onChange={(event) => handleCheckboxChange(event, doc)}
+                    {filteredDpias.map(doc => (
+                    <Box bgcolor="#e0e0e0" p={0.5} borderRadius={0.5}>
+                        <ListItem key={doc.dpiaID} className="flex justify-between items-center"
+                            style={{ backgroundColor: '#ffffff', // White background for each item
+                                borderRadius: '4px', // Rounded corners for each item
+                                boxShadow: '0px 3px 6px rgba(0, 0, 0, 0.1)', // Light shadow to make items stand out
+                                justifyContent: 'space-between',
+                                margin: '5px 5px',
+                                width: 'auto',
+                                alignItems: 'center', }}
+                        >
+                        <Checkbox
+                            checked={selectedDocs.includes(doc.dpiaID) && selectedNames.includes(doc.title) && selectedStatus.includes(doc.status)}
+                            onChange={(event) => handleCheckboxChange(event, doc)}
+                        />
+                            <ListItemIcon>
+                                <AssignmentIcon fontSize="large"/>
+                            </ListItemIcon>
+                            <ListItemText
+                                primary={doc.title}
                             />
-                                <ListItemIcon>
-                                    <AssignmentIcon fontSize="large"/>
-                                </ListItemIcon>
-                                <ListItemText
-                                    primary={doc.title}
-                                />
-                                {doc.status == 'working' && (
-                                    <img src='/loading-gif.gif' alt="GIF" style={{width:'30px', height:'30px', marginRight: '15px'}}/>
+                            {doc.status == 'working' && (
+                                <img src='/loading-gif.gif' alt="GIF" style={{width:'30px', height:'30px', marginRight: '15px'}}/>
+                            )}
+                            <div >
+                                {doc.status == 'working' ? (
+                                    <h1>Processing, please wait...</h1>
+                                ) : (
+                                    <Button onClick={() => handleView(doc.dpiaID, doc.title)} variant="contained" color="primary" style={{ marginRight: '10px' }}>View</Button>
                                 )}
-                                <div >
-                                    {doc.status == 'working' ? (
-                                        <h1>Processing, please wait...</h1>
-                                    ) : (
-                                        <Button onClick={() => handleView(doc.dpiaID, doc.title)} variant="contained" color="primary" style={{ marginRight: '10px' }}>View</Button>
-                                    )}
-                                </div>
-                            </ListItem>
-                        ))}
+                            </div>
+                        </ListItem>
+                    </Box>
+                    ))}
                     </List>
                     </Grid>
-                </Grid>
-                </Box>
-            </div>
+                </div>
+            ) : (
+                <Report token={token} title={title} description={description} projectID={projectID} />
+            )}
+
 
             <Dialog open={open} onClose={handleClose}  fullWidth maxWidth="lg">
                 <DialogTitle>{selectedDocName}</DialogTitle>

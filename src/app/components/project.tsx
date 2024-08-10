@@ -144,74 +144,75 @@ const Project: React.FC<ProjProps> = ({ token }) => {
             <header className="p-4 border-b w-full h-16 bg-gradient-to-r from-purple-500 to-pink-500">
                 <h1 className="text-3xl font-bold">PROJECT</h1>
             </header>
-            <div className="p-4">
+            <Box bgcolor="p-3 #ededed" p={0.5} borderRadius={1}>
+            <Box className="p-3" bgcolor="#ededed">
                 {!showTabs ? (
-                    <Button variant="contained" color="success" onClick={handleCreateProject}>Create Project</Button>
-                ) : (
-                    <Button variant="contained" color="primary" onClick={() => setShowTabs(false)}>Back</Button>
-                )}
-            </div>
+                    <>
+                    <TextField
+                        label="Search Projects"
+                        color="primary"
+                        variant="outlined"
+                        value={searchQuery}
+                        onChange={handleSearchChange}
+                        fullWidth
+                        margin="normal"/>
+
+                    <Box display="flex" alignItems="center" style={{marginTop:"8px"}}>
+                        <Button variant="contained" color="success" onClick={handleCreateProject}>Create Project</Button>
+                        {filteredProjects.length > 0 && (
+                            <div>
+                            <Button onClick={handleSelectAll} variant="contained" color="secondary" style={{ marginLeft: '20px' }}>
+                                {selectedPrjs.length === filteredProjects.length ? 'Deselect All' : 'Select All'}
+                            </Button>
+                            {selectedPrjs.length > 0 && (
+                            <Button variant="contained" color="secondary" onClick={handleProjectDelete} style={{ marginLeft: '20px' }}>
+                                Delete
+                            </Button>
+                            )}
+                            </div>
+                        )}
+                    </Box>
+                    </>
+                    ) : (
+                        <Button variant="contained" color="primary" onClick={() => setShowTabs(false)}>Back</Button>
+                    )}
+            </Box>
+            </Box>
+            
             <section className="p-4 flex-1 overflow-auto" ref={chatParent} >
                 {!showTabs ? ( 
                     <div>
-                        <Box bgcolor="#e0e0e0" p={3} borderRadius={4} style={{ marginTop: '20px' }}>
-                        <TextField
-                            label="Search"
-                            color="primary"
-                            variant="outlined"
-                            value={searchQuery}
-                            onChange={handleSearchChange}
-                            fullWidth
-                            margin="normal"
-                            style={{ margin: '15px 0', }}
-                        />
-
-                        {filteredProjects.length > 0 && (
-                        <div>
-                        <Button onClick={handleSelectAll} variant="contained" color="secondary">
-                            {selectedPrjs.length === filteredProjects.length ? 'Deselect All' : 'Select All'}
-                        </Button>
-                        {selectedPrjs.length > 0 && (
-                        <Button variant="contained" color="secondary" onClick={handleProjectDelete} style={{ marginLeft: '20px' }}>
-                            Delete
-                        </Button>
-                        )}
-                        </div>
-                        )}
-                        <Grid container spacing={2}>
-                            <Grid item xs={12}>
-                            
+                        <Grid item xs={12}>
                             <List>
-                                {filteredProjects.map(prj => (
-                                    <ListItem key={prj.projectID} className="flex justify-between items-center"
-                                        style={{ backgroundColor: '#ffffff', // White background for each item
-                                            borderRadius: '4px', // Rounded corners for each item
-                                            boxShadow: '0px 3px 6px rgba(0, 0, 0, 0.1)', // Light shadow to make items stand out
-                                            display: 'flex',
-                                            justifyContent: 'space-between',
-                                            margin: '10px 0',
-                                            alignItems: 'center', }}
-                                    
-                                    >
-                                    <Checkbox
-                                        checked={selectedPrjs.includes(prj.projectID)}
-                                        onChange={(event) => handleCheckboxChange(event, prj)}
+                            {filteredProjects.map(prj => (
+                            <Box bgcolor="#e0e0e0" p={0.5} borderRadius={0.5} >
+                                <ListItem key={prj.projectID} className="flex justify-between items-center"
+                                    style={{ backgroundColor: '#ffffff', // White background for each item
+                                        borderRadius: '4px', // Rounded corners for each item
+                                        boxShadow: '0px 3px 6px rgba(0, 0, 0, 0.1)', // Light shadow to make items stand out
+                                        justifyContent: 'space-between',
+                                        margin: '5px 5px',
+                                        width: 'auto',
+                                        alignItems: 'center', }}
+                                >
+                                <Checkbox
+                                    checked={selectedPrjs.includes(prj.projectID)}
+                                    onChange={(event) => handleCheckboxChange(event, prj)}
+                                />
+                                    <ListItemIcon>
+                                        <DatasetIcon fontSize="large"/>
+                                    </ListItemIcon>
+                                    <ListItemText
+                                        primary={prj.title}
                                     />
-                                        <ListItemIcon>
-                                            <DatasetIcon fontSize="large"/>
-                                        </ListItemIcon>
-                                        <ListItemText
-                                            primary={prj.title}
-                                        />
-                                        <div >
-                                            <Button variant="contained" color="primary" style={{ marginRight: '10px' }} onClick={() => handleEnterProject(prj.projectID, prj.title, prj.description)}>Enter</Button>
-                                        </div>
-                                    </ListItem>
-                                ))}
+                                    <div >
+                                        <Button variant="contained" color="primary" style={{ marginRight: '10px' }} onClick={() => handleEnterProject(prj.projectID, prj.title, prj.description)}>Enter</Button>
+                                    </div>
+                                </ListItem>
+                            </Box>
+                            ))}
                             </List>
-                            </Grid>
                         </Grid>
-                        </Box>
                     </div> 
                 ) : (
                     <Report token={token} projectID={projectID} title={title} description={description}/>

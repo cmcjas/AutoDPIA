@@ -124,7 +124,7 @@ const Template: React.FC<TempProps> = ({ token }) => {
                     setSelectedTemplate(res.data.tempName);
                 } catch (error) {
                     console.error('Error extracting template', error);
-                    setMessage('Not a valid DPIA template.');
+                    setMessage('Not a valid DPIA template or name already exists.');
                     setProcessing(false);
                 }
             } else {
@@ -139,7 +139,7 @@ const Template: React.FC<TempProps> = ({ token }) => {
         
     };
 
-    const saveTemplateData = async () => {
+    const selectTempData = async () => {
         try {
             const res = await axios.post('http://localhost:8080/select_template', editableData, {
                 headers: {
@@ -149,11 +149,6 @@ const Template: React.FC<TempProps> = ({ token }) => {
                 }
             });
 
-            if (res) {
-                console.log('Template data saved successfully.');
-            } else {
-                console.error('Failed to save template data.');
-            }
         } catch (error) {
             console.error('Error:', error);
         }
@@ -161,11 +156,11 @@ const Template: React.FC<TempProps> = ({ token }) => {
 
     useEffect(() => {
         setEditableData(templateData);
-        saveTemplateData();
+        selectTempData();
     }, [selectedTemplateData]);
 
     useEffect(() => {
-        saveTemplateData();
+        selectTempData();
     }, [editableData]);
 
 
@@ -419,6 +414,7 @@ const Template: React.FC<TempProps> = ({ token }) => {
     };
 
     const handleClickOpen = () => {
+        setMessage('');
         setOpen(true);
       };
     
@@ -432,20 +428,25 @@ const Template: React.FC<TempProps> = ({ token }) => {
           setError(true);
           return;
         }
-    
-        const res = await axios.post('http://localhost:8080/save_template', { tempName: name }, {
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`
-          }
-        });
-    
-        if (res) {
-          // handle success
-          handleClose();
-        } else {
-          // handle error
+
+        try {
+            const res = await axios.post('http://localhost:8080/save_template', { tempName: name }, {
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            }
+            });
+        
+            if (res) {
+            // handle success
+            handleClose();
+            setMessage('Template saved successfully.');
+            } 
+        } catch (error) {
+            console.error('Error:', error);
+            setMessage('Name already exists.');
         }
+
       };
 
 
@@ -470,7 +471,8 @@ const Template: React.FC<TempProps> = ({ token }) => {
                 <h1 className="text-3xl font-bold">TEMPLATE</h1>
             </header>
 
-            <div className="p-4">
+            <Box bgcolor="#ededed" p={0.5} borderRadius={1}>
+            <Box className="p-3" bgcolor="#ededed">
                 <h1 className="text-1xl font-bold">Choose a Template</h1>
                 <Select value={selectedTemplate} label="Template" onChange={handleSelectChange}>
                     <MenuItem value="">None...</MenuItem>
@@ -497,7 +499,8 @@ const Template: React.FC<TempProps> = ({ token }) => {
                     )}
                 </Button>
                 <p>{message}</p>
-            </div>
+            </Box>
+            </Box>
             <section className="p-4 flex-1 overflow-auto" ref={chatParent}>
 
                 {selectedTemplate && selectedTemplateData && (
@@ -630,6 +633,7 @@ const Template: React.FC<TempProps> = ({ token }) => {
                                 Save
                             </Button>
                             </DialogActions>
+                            <p>{message}</p>
                         </Dialog>
                     </div>
                     ))}

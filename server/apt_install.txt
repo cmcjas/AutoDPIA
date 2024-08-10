@@ -5,4 +5,4 @@ sqlite3
 poppler-utils
 tesseract-ocr
 python3-poetry
-lib32stdc++6
+libreoffice

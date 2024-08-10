@@ -10,6 +10,8 @@ import { Dpia } from "./dpia";
 import Snackbar, { SnackbarOrigin } from '@mui/material/Snackbar';
 import { styled } from '@mui/material/styles';
 
+import React from 'react';
+
 import List from '@mui/material/List';
 import ListItem from '@mui/material/ListItem';
 import ListItemIcon from '@mui/material/ListItemIcon';
@@ -23,8 +25,6 @@ pdfjs.GlobalWorkerOptions.workerSrc = new URL(
     import.meta.url,
   ).toString();
   
-import React from 'react';
-
 
 interface ReportProps {
   token: string | null;
@@ -49,8 +49,9 @@ const VisuallyHiddenInput = styled('input')({
 export function Report(props: ReportProps) {
 
     const [activeTab, setActiveTab] = useState('files');
-    const [uploadMessage, setUploadMessage] = useState('');
+    const [fileActiveTab, setFileActiveTab] = useState('files');
 
+    const [uploadMessage, setUploadMessage] = useState('');
     const [open, setOpen] = useState(false);
     const [selectedDoc, setSelectedDoc] = useState<string | null>(null);
     const [selectedDocName, setSelectedDocName] = useState<string | null>('');
@@ -113,13 +114,10 @@ export function Report(props: ReportProps) {
                 });
                 setUploadMessage(`File(s) uploaded successfully`);
                 fetchDocuments(); // Refresh the document list
-
                 event.target.value = ''; // clear the input after uploading
-            } else {
-                setUploadMessage(`Error uploading file`);
-            }
+            } 
         } catch (error) {
-            setUploadMessage(`Error uploading file`);
+            setUploadMessage(`File name already exists`);
         }
 
     };
@@ -230,20 +228,34 @@ export function Report(props: ReportProps) {
 
     return (
         <main className="flex flex-col w-full h-screen max-h-dvh bg-background">
-            <Box bgcolor="#ededed" p={0.5} borderRadius={1} style={{ marginTop: '15px'}}>
-                <header className="p-4 border-b w-full max-w-3xl mx-auto">
-                    <h1 className="text-2xl font-bold">Project: {title}</h1>
-                    <h2>{description}</h2>
-                </header>
-                    <Tab onClick={() => setActiveTab('files')} label='Files' style={{ backgroundColor: activeTab === 'files' ? '#1c1d1f' : 'transparent',
-                     color: activeTab === 'files' ? 'white' : 'black' }}></Tab>
-                    <Tab onClick={() => setActiveTab('reports')} label='Dpias' style={{ backgroundColor: activeTab === 'reports' ? '#1c1d1f' : 'transparent',
-                     color: activeTab === 'reports' ? 'white' : 'black' }}></Tab>
-            </Box>
+            <div className="sticky top-0" style={{zIndex: 100}}>
+            <Box bgcolor="#ededed" borderRadius={2}>
+                {fileActiveTab === 'files' && (
+                    <>
+                    <header className="p-4 border-b w-full max-w-3xl mx-auto">
+                        <h1 className="text-2xl font-bold">Project: {title}</h1>
+                        <h2>{description}</h2>
+                    </header>
+                    <Tab onClick={() => {setActiveTab('files'); setFileActiveTab('files')}} label='Files' style={{ backgroundColor: activeTab === 'files' ? '#1c1d1f' : 'transparent',
+                        color: activeTab === 'files' ? 'white' : 'black' }}></Tab>
+                    <Tab onClick={() => {setActiveTab('reports'); setFileActiveTab('reports')}} label='Dpias' style={{ backgroundColor: activeTab === 'reports' ? '#1c1d1f' : 'transparent',
+                        color: activeTab === 'reports' ? 'white' : 'black' }}></Tab>     
+                    </>
+                )}
 
-            <div className="p-4">
-            {activeTab === 'files' ? (
-                <div>
+                {activeTab === 'files' && (
+                <Box className="p-4" bgcolor="#ededed"> 
+                <TextField
+                    label="Search Files"
+                    color="primary"
+                    variant="outlined"
+                    value={searchQuery}
+                    onChange={handleSearchChange}
+                    fullWidth
+                    style={{ margin: '15px 0', }}
+                />
+
+                <Box display="flex" alignItems="center">
                     <Button
                         component="label"
                         variant="contained"
@@ -254,88 +266,81 @@ export function Report(props: ReportProps) {
                         Upload
                         <VisuallyHiddenInput type="file" multiple onChange={handleFileChange} accept=".txt,.docx,.pdf" />
                     </Button>
+
+                    {filteredDocuments.length > 0 && (
+                        <div>
+                        <Button onClick={handleSelectAll} variant="contained" color="secondary" style={{ marginLeft: '20px' }}>
+                            {selectedDocs.length === filteredDocuments.length ? 'Deselect All' : 'Select All'}
+                        </Button>
+                        <Button onClick={handleSelectDpiaAll} variant="contained" color="secondary" style={{ marginLeft: '20px' }}>
+                            {selectedDpiaDocs.length === filteredDocuments.length ? 'Deselect All Dpia Files' : 'Select All Dpia Files'}
+                        </Button>
+                        {selectedDocs.length > 0 && (
+                        <Button variant="contained" color="secondary" onClick={handleFileDelete} style={{ marginLeft: '20px' }}>
+                            Delete
+                        </Button>
+                        )}
+                        </div>
+                    )}
+                </Box>
+                </Box>
+            )}  
+            </Box>    
+            </div>
+
+            {activeTab === 'files' ? (
+                <div className="p-4">
                     <Box sx={{ width: 500 }}>
                     <Snackbar
                         anchorOrigin={{ vertical, horizontal }}
                         autoHideDuration={1000}
                         open={uploadMessage !== ''}
                         onClose={() => setUploadMessage('')}
-                        message="File(s) uploaded successfully."
+                        message={uploadMessage}
                         key={vertical + horizontal}
                     />
                     </Box>
-
-                    <Box bgcolor="#e0e0e0" p={3} borderRadius={4} style={{ marginTop: '20px' }}>
-                    <TextField
-                        label="Search"
-                        color="primary"
-                        variant="outlined"
-                        value={searchQuery}
-                        onChange={handleSearchChange}
-                        fullWidth
-                        style={{ margin: '15px 0', }}
-                    />
-
-                    {filteredDocuments.length > 0 && (
-                    <div>
-                    <Button onClick={handleSelectAll} variant="contained" color="secondary" >
-                        {selectedDocs.length === filteredDocuments.length ? 'Deselect All' : 'Select All'}
-                    </Button>
-                    <Button onClick={handleSelectDpiaAll} variant="contained" color="secondary" style={{ marginLeft: '20px' }}>
-                        {selectedDpiaDocs.length === filteredDocuments.length ? 'Deselect All Dpia Files' : 'Select All Dpia Files'}
-                    </Button>
-                    {selectedDocs.length > 0 && (
-                    <Button variant="contained" color="secondary" onClick={handleFileDelete} style={{ marginLeft: '20px' }}>
-                        Delete
-                    </Button>
-                    )}
-                    </div>
-                    )}
                     
-                    <Grid container spacing={2}>
-                        <Grid item xs={12}>
-                        
+                    <Grid item xs={12}>
                         <List>
-                            {filteredDocuments.map(doc => (
-                                <ListItem key={doc.fileID} className="flex justify-between items-center"
-                                    style={{ backgroundColor: '#ffffff', // White background for each item
-                                        borderRadius: '4px', // Rounded corners for each item
-                                        boxShadow: '0px 3px 6px rgba(0, 0, 0, 0.1)', // Light shadow to make items stand out
-                                        display: 'flex',
-                                        justifyContent: 'space-between',
-                                        margin: '10px 0',
-                                        alignItems: 'center', }}
-                                
-                                >
-                                <Checkbox
-                                    checked={selectedDocs.includes(doc.fileID)}
-                                    onChange={(event) => handleCheckboxChange(event, doc)}
+                        {filteredDocuments.map(doc => (
+                        <Box bgcolor="#e0e0e0" p={0.5} borderRadius={0.5}>
+                            <ListItem key={doc.fileID} className="flex justify-between items-center"
+                                style={{ backgroundColor: '#ffffff', // White background for each item
+                                    borderRadius: '4px', // Rounded corners for each item
+                                    boxShadow: '0px 3px 6px rgba(0, 0, 0, 0.1)', // Light shadow to make items stand out
+                                    justifyContent: 'space-between',
+                                    margin: '5px 5px',
+                                    width: 'auto',
+                                    alignItems: 'center', }}
+                            
+                            >
+                            <Checkbox
+                                checked={selectedDocs.includes(doc.fileID)}
+                                onChange={(event) => handleCheckboxChange(event, doc)}
+                            />
+                                <ListItemIcon>
+                                    <FolderIcon fontSize="large"/>
+                                </ListItemIcon>
+                                <ListItemText
+                                    primary={doc.fileName}
                                 />
-                                    <ListItemIcon>
-                                        <FolderIcon fontSize="large"/>
-                                    </ListItemIcon>
-                                    <ListItemText
-                                        primary={doc.fileName}
-                                    />
-                                <Checkbox
-                                    checked={selectedDpiaDocs.includes(doc.fileID)}
-                                    onChange={(event) => dpiaCheckboxChange(event, doc)}
-                                />
-                                    <div >
-                                        <Button onClick={() => handleView(doc.fileID, doc.fileName)} variant="contained" color="primary" style={{ marginRight: '10px' }}>View</Button>
-                                    </div>
-                                </ListItem>
-                            ))}
+                            <Checkbox
+                                checked={selectedDpiaDocs.includes(doc.fileID)}
+                                onChange={(event) => dpiaCheckboxChange(event, doc)}
+                            />
+                                <div >
+                                    <Button onClick={() => handleView(doc.fileID, doc.fileName)} variant="contained" color="primary" style={{ marginRight: '10px' }}>View</Button>
+                                </div>
+                            </ListItem>
+                        </Box>
+                        ))}
                         </List>
-                        </Grid>
                     </Grid>
-                    </Box>
                 </div>
-                
             ) : (
-                <Dpia token={token} projectID={projectID} dpiaFileNames={selectedDpiaDocName} status={""}/>
+                <Dpia token={token} title={title} description={description} projectID={projectID} dpiaFileNames={selectedDpiaDocName} status={""}/>
             )}
-            </div>
 
             <Dialog open={open} onClose={handleClose}  fullWidth maxWidth="lg">
                 <DialogTitle>{selectedDocName}</DialogTitle>

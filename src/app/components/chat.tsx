@@ -59,6 +59,9 @@ const Chat: React.FC<ChatProps> = ({ token }) => {
 
     useEffect(() => {
         const domNode = chatParent.current
+        if (domNode) {
+            domNode.scrollTop = domNode.scrollHeight
+        }
     })
 
     const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {

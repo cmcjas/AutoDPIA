@@ -295,6 +295,11 @@ def get_doc():
     
     for file in files:  
         filename = secure_filename(file.filename)
+        filename_root, _ = os.path.splitext(filename)
+
+        existing_file = File.query.filter_by(fileName=filename_root, projectID=project_id).first()
+        if existing_file:
+            return jsonify({"error": f"File with name '{filename}' already exists for this project"}), 400
 
         if mode == "report":
             file_path = os.path.join(UP_DIR_R, filename)
@@ -324,7 +329,7 @@ def get_doc():
             file_path = pdf_path
             filename = os.path.basename(pdf_path)
 
-    return jsonify({"message": "Embedding uploaded successfully", "filename": filename, "ragMode": True}), 200
+    return jsonify({"message": "File uploaded successfully", "filename": filename, "ragMode": True}), 200
 
 
 @app.route('/toSQL', methods=['POST'])
@@ -542,6 +547,11 @@ def extract_template():
     final_answer = json.dumps(json.loads(final_answer), indent=4)
 
     new_template = Template(userID=get_jwt_identity(), tempName=filename + '_prototype', tempData=final_answer)
+
+    existing_tempName = Template.query.filter_by(userID=get_jwt_identity(), tempName=filename + '_prototype').first()
+    if existing_tempName:
+        return jsonify({"error": "Template with the same name already exists"}), 400
+
     db.session.add(new_template)
     db.session.commit()
     if os.path.exists(temp_path) and os.path.isdir(temp_path):
@@ -559,6 +569,10 @@ def save_template():
     # Open the file and read its content
     with open(BASE_DIR + f'/template/{get_jwt_identity()}/select.txt', 'r') as file:
         tempData = file.read()
+
+    existing_tempName = Template.query.filter_by(userID=get_jwt_identity(), tempName=tempName).first()
+    if existing_tempName:
+        return jsonify({"error": "Template with the same name already exists"}), 400
 
     if not tempName or not tempData:
         return jsonify({'error': 'Invalid input'}), 400
@@ -671,8 +685,10 @@ def delete_project():
                 db.session.delete(dpia_file)
             
             # Delete the project record from the database
-            shutil.rmtree(folder_path_file)
-            shutil.rmtree(folder_path_dpia)
+            if os.path.exists(folder_path_file) and os.path.isdir(folder_path_file):
+                shutil.rmtree(folder_path_file)
+            if os.path.exists(folder_path_dpia) and os.path.isdir(folder_path_dpia):
+                shutil.rmtree(folder_path_dpia)
             db.session.delete(project)
             db.session.commit()
         else:
