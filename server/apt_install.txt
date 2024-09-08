@@ -6,3 +6,4 @@ poppler-utils
 tesseract-ocr
 python3-poetry
 libreoffice
+redis-tools

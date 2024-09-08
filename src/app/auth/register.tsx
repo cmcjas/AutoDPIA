@@ -17,8 +17,6 @@ const Register = (props: LoginProps) => {
   const [error, setError] = useState('');
   const [login, setLogin] = useState(false);
 
-  // const { token, removeToken, setToken } = useToken();
-
   const handleLogin = () => {
     props.setLogin(false);
   };
@@ -71,9 +69,5 @@ const Register = (props: LoginProps) => {
         </Button> 
       </form>
     )}
-
-
-
-
 
 export default Register;

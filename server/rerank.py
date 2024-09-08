@@ -11,7 +11,6 @@ def rerank_response(query, documents):
 
     # Load the model, here we use our base sized model
     model = CrossEncoder("mixedbread-ai/mxbai-rerank-base-v1")
-
     # Lets get the scores
     results = model.rank(query, documents, return_documents=True, top_k=10)
     format_results = [entry['text'] for entry in results]

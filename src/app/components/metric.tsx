@@ -21,7 +21,6 @@ const Metric: React.FC<MetricProps> = ({ token }) => {
       });
 
     useEffect(() => {
-
         const fetchMetrics = async () => {
             const response = await axios.get('http://localhost:8080/usage_metric',
             {
@@ -32,13 +31,10 @@ const Metric: React.FC<MetricProps> = ({ token }) => {
             );
             setMetrics(response.data);
         };
-
         // Fetch metrics immediately on component mount
         fetchMetrics();
-
         // Set up interval to fetch metrics every second
         const interval = setInterval(fetchMetrics, 1000);
-
         // Clean up interval on component unmount
         return () => clearInterval(interval);
     }, []);

@@ -5,7 +5,7 @@ import { useEffect, useState } from 'react'
 import axios from 'axios';
 import { pdfjs, Document, Page } from 'react-pdf';
 import PDFView from "./view";
-import { Report } from "./report";
+import Report from "./report";
 
 import List from '@mui/material/List';
 import ListItem from '@mui/material/ListItem';
@@ -30,19 +30,20 @@ interface DpiaProps {
   status: string;
   title: string;
   description: string;
+  email: string;
 }
 
-export function Dpia(props: DpiaProps) {
+const Dpia: React.FC<DpiaProps> = ({ email, token, title, description, projectID, dpiaFileNames }) => {
 
     const [activeTab, setActiveTab] = useState('reports');
     const [dpiaActiveTab, setDpiaActiveTab] = useState('reports');
-
+    const [message, setMessage] = useState<string | null>(null);
+    const [taskID, setTaskID] = useState<string>('');
     const [open, setOpen] = useState(false);
     const [selectedDoc, setSelectedDoc] = useState<string | null>(null);
     const [selectedDocName, setSelectedDocName] = useState<string | null>('');
-    const [generating, setGenerating] = useState<boolean>(false);
 
-    const [dpias, setDpias] = useState<{ dpiaID: number; title: string; status: string }[]>([]);
+    const [dpias, setDpias] = useState<{ dpiaID: number; title: string; status: string, tempName: string }[]>([]);
     const [selectedDocs, setSelectedDocs] = useState<number[]>([]);
     const [selectedNames, setSelectedNames] = useState<string[]>([]);
     const [selectedStatus, setSelectedStatus] = useState<string[]>([]);
@@ -50,17 +51,12 @@ export function Dpia(props: DpiaProps) {
 
     const [openGenerate, setOpenGenerate] = useState<boolean>(false);
     const [dpiaTitle, setDpiaTitle] = useState<string>('');
+    // Check if any dictionary in selectedStatus has status 'working'
+    const isDisabled = dpias.some(item => item.status === 'working');
 
     const filteredDpias = dpias.filter(doc =>
         doc.title.toLowerCase().includes(searchQuery.toLowerCase())
     );
-
-    const projectID = props.projectID;
-    const dpiaFileNames = props.dpiaFileNames;
-    const token = props.token;
-    const title = props.title;
-    const description = props.description;
-    const status = props.status;
 
     const handleSelectAll = () => {
         if (selectedDocs.length === filteredDpias.length) {
@@ -85,6 +81,7 @@ export function Dpia(props: DpiaProps) {
 
     const handleDpiaStart = async () => {
 
+        setMessage('');
         try {
             const init = await axios.post('http://localhost:8080/init_dpia', {
                 projectID: projectID,
@@ -100,25 +97,48 @@ export function Dpia(props: DpiaProps) {
             
             try {
                 setOpenGenerate(false);
-                setGenerating(true);
-                const res = await axios.post('http://localhost:8080/generate_dpia', {
+                const res = await axios.post('http://localhost:8080/start_task', {
                     projectID: projectID,
                     title: dpiaTitle,
                     fileName: dpiaFileNames,
-                    dpiaID: dpiaID
+                    dpiaID: dpiaID,
+                    taskName: 'generate_dpia'
                 }, {
                     headers: {
                         'Authorization': `Bearer ${token}`
                     }
                 });
-                fetchDpias();
-                setGenerating(false);
 
+                setTaskID(res.data['task_id']);
+
+                const generate = await axios.get('http://localhost:8080/get_task_result',
+                    {
+                        params: {
+                            taskID: res.data['task_id'],
+                            taskName: 'generate_dpia',
+                        },
+                        headers: {
+                            'Authorization': `Bearer ${token}`
+                        }
+                    } 
+                );
+
+                if (generate) {
+                    const resToken = await axios.post('http://localhost:8080/refresh_token',{email: email});
+                    if (resToken.data.access_token) {
+                      token = resToken.data.access_token;
+                    }
+
+                    fetchDpias();
+                    setTaskID('');
+                }
+             
             } catch (error) {
                 console.error('Error starting DPIA:', error);
             }
         } catch (error) {
             console.error('Error starting DPIA:', error);
+            setMessage('Check if template and files are selected or filename already exists');
         }
     };
     
@@ -134,8 +154,6 @@ export function Dpia(props: DpiaProps) {
                 'Authorization': `Bearer ${token}`
             }
         });
-
-            const status = res.data[0] && res.data[0].status;
             setDpias(res.data);
         } catch (error) {
             console.error('Error fetching documents:', error);
@@ -150,9 +168,17 @@ export function Dpia(props: DpiaProps) {
                     'Authorization': `Bearer ${token}`
                 },
             });
+            if (taskID) {
+                const cancel = await axios.post('http://localhost:8080/cancel_task', { taskID: taskID },
+                    {
+                        headers: {
+                            'Authorization': `Bearer ${token}`
+                        }
+                    }
+                );
+            }
             fetchDpias(); // Refresh the document list
             setSelectedDocs([]); // Clear the selected documents
-            setGenerating(false);
 
         } catch (error) {
             console.error('Error deleting documents:', error);
@@ -216,6 +242,8 @@ export function Dpia(props: DpiaProps) {
     const handleSearchChange = (event: React.ChangeEvent<HTMLInputElement>) => {
         setSearchQuery(event.target.value);
     };
+    
+    console.log('TEST', dpias)
 
     return (
         <main className="flex flex-col w-full h-screen max-h-dvh bg-background">
@@ -249,20 +277,20 @@ export function Dpia(props: DpiaProps) {
                 />
 
                     <Box display="flex" alignItems="center">
-                        <Button onClick={handleGenerate} variant="contained" color="success" disabled={generating}>Generate</Button>
+                        <Button onClick={handleGenerate} variant="contained" color="success" disabled={isDisabled}>Generate</Button>
 
                         {filteredDpias.length > 0 && (
                         <div>
-                        <Button onClick={handleSelectAll} variant="contained" color="secondary">
+                        <Button onClick={handleSelectAll} variant="contained" color="secondary" style={{ marginLeft: '20px' }}>
                             {selectedDocs.length === filteredDpias.length ? 'Deselect All' : 'Select All'}
                         </Button>
                         {selectedDocs.length > 0 && (
-                        <Button variant="contained" color="secondary" onClick={handleDpiaDelete} style={{ marginLeft: '20px' }}>
+                        <Button variant="outlined" color="secondary" onClick={handleDpiaDelete} style={{ marginLeft: '20px' }}>
                             Delete
                         </Button>
                         )}
                         {selectedDocs.length > 0 && selectedStatus.every(status => status == 'completed') && (
-                        <Button variant="contained" color="primary" onClick={handleDownload} style={{ marginLeft: '20px' }}>
+                        <Button variant="outlined" color="primary" onClick={handleDownload} style={{ marginLeft: '20px' }}>
                             Download
                         </Button>
                         )}
@@ -290,7 +318,7 @@ export function Dpia(props: DpiaProps) {
                                 alignItems: 'center', }}
                         >
                         <Checkbox
-                            checked={selectedDocs.includes(doc.dpiaID) && selectedNames.includes(doc.title) && selectedStatus.includes(doc.status)}
+                            checked={selectedDocs.includes(doc.dpiaID)}
                             onChange={(event) => handleCheckboxChange(event, doc)}
                         />
                             <ListItemIcon>
@@ -298,6 +326,7 @@ export function Dpia(props: DpiaProps) {
                             </ListItemIcon>
                             <ListItemText
                                 primary={doc.title}
+                                secondary={'Template: ' + doc.tempName}
                             />
                             {doc.status == 'working' && (
                                 <img src='/loading-gif.gif' alt="GIF" style={{width:'30px', height:'30px', marginRight: '15px'}}/>
@@ -316,7 +345,7 @@ export function Dpia(props: DpiaProps) {
                     </Grid>
                 </div>
             ) : (
-                <Report token={token} title={title} description={description} projectID={projectID} />
+                <Report email={email} token={token} title={title} description={description} projectID={projectID} />
             )}
 
 
@@ -356,6 +385,7 @@ export function Dpia(props: DpiaProps) {
                 ))}
             </List>
             </DialogContent>
+            <p>{message}</p>
             <DialogActions>
                 <Button onClick={closeGenerate}>Cancel</Button>
                 <Button onClick={handleDpiaStart} color="primary">Start</Button>
@@ -365,3 +395,5 @@ export function Dpia(props: DpiaProps) {
     );
 
 }
+
+export default Dpia;

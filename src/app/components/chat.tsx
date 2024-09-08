@@ -41,6 +41,7 @@ const Chat: React.FC<ChatProps> = ({ token }) => {
     const [input, setInput] = useState('');
     const [fetching, setFetching] = useState<boolean>(false);
     const [suggestions, setSuggestions] = useState<boolean>(false);
+    const [taskID, setTaskID] = useState<string>('');
 
     const [responses, setResponse] = useState<Message[]>([{ 
         sender: 'bot', text: 'Hey there! I am here to help you with your DPIA. Please type your question below or choose from the following suggestions.', 
@@ -105,7 +106,6 @@ const Chat: React.FC<ChatProps> = ({ token }) => {
         
     };
 
-
     /* randomly select a message */
     const messages = [
         "I hope this has been helpful to you. If you have any more questions, feel free to ask.",
@@ -114,10 +114,12 @@ const Chat: React.FC<ChatProps> = ({ token }) => {
         "I'm here to help if you need anything else.",
         "I hope you find this helpful. Click 'CLEAR' to start anew.",
     ];
-    
+
     const getRandomMessage = () => {
         return messages[Math.floor(Math.random() * messages.length)];
     };
+
+
 
     const fetchMessage = async () => {
         try {
@@ -125,16 +127,31 @@ const Chat: React.FC<ChatProps> = ({ token }) => {
                 ...prevMessages,
                 { sender: 'bot', text:'', type: 'gif', src: '/loading-gif.gif' }
             ]);
-
+            
             const tempInput = input;
 
-            const res = await axios.post('http://localhost:8080/get_msg', 
+            const res = await axios.post('http://localhost:8080/start_task', 
                 { 
                     message: input, 
                     pdfMode: pdfMode, 
-                    fileName: fileName 
+                    fileName: fileName, 
+                    taskName: 'get_msg',
                 },
                 {
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    }
+                }
+            );
+
+            setTaskID(res.data['task_id']);
+
+            const result = await axios.get('http://localhost:8080/get_task_result',
+                {
+                    params: {
+                        taskID: res.data['task_id'],
+                        taskName: 'get_msg'
+                    },
                     headers: {
                         'Authorization': `Bearer ${token}`
                     }
@@ -154,10 +171,8 @@ const Chat: React.FC<ChatProps> = ({ token }) => {
                 return prevMessages;
             });
             
-            const botMessage: Message = { sender: 'bot', text: res.data['reply'] };
+            const botMessage: Message = { sender: 'bot', text: result.data['result'] };
             setResponse((prevMessages) => [...prevMessages, botMessage]);
-
-            responses.map((message) => { console.log(message.text) });
 
             if (tempInput === 'What is DPIA?') {
                 setResponse((prevMessages) => [...prevMessages, { sender: 'bot', text: "You may find the following suggestions helpful.",
@@ -178,8 +193,8 @@ const Chat: React.FC<ChatProps> = ({ token }) => {
                 }]);
             } else if (tempInput === 'What is the document about?') {
                 setResponse((prevMessages) => [...prevMessages, { sender: 'bot', text: "You may find the following suggestions helpful.",
-                    buttons: [{ label: 'Describe all images and figures in the document', onClick: () => {setInput('Describe all images and figures in the document'), setSuggestions(true)}},
-                    { label: 'Describe all tables in the document', onClick: () => {setInput('Describe all tables in the document'), setSuggestions(true)} },
+                    buttons: [{ label: 'Describe all image components in the document', onClick: () => {setInput('Describe all image components in the document'), setSuggestions(true)}},
+                    { label: 'Describe all table components in the document', onClick: () => {setInput('Describe all tables components in the document'), setSuggestions(true)} },
                     { label: 'Summarise each section of the document', onClick: () => {setInput('Summarise each section of the document'), setSuggestions(true)} }]
                 }]);
             } else if (tempInput === 'What is the document implication for conducting a DPIA?') {
@@ -253,6 +268,16 @@ const Chat: React.FC<ChatProps> = ({ token }) => {
                 }
             );
 
+            if (taskID) {
+                const cancel = await axios.post('http://localhost:8080/cancel_task', { taskID: taskID },
+                    {
+                        headers: {
+                            'Authorization': `Bearer ${token}`
+                        }
+                    }
+                );
+            }
+            
         } catch (error) {
             console.error('Error:', error);
             const errorMessage: Message = { sender: 'bot', text: ' An error occurred while clearing the chat.' };
@@ -270,12 +295,13 @@ const Chat: React.FC<ChatProps> = ({ token }) => {
 
             <section className="p-4 flex-1 overflow-auto" ref={chatParent}>
             <Box bgcolor="#e0e0e0" p={3} borderRadius={4} style={{ marginTop: '20px'}}>
-                <ul className="flex flex-col w-full max-w-3xl mx-auto space-y-2">
+                <ul className="flex flex-col w-full max-w-3xl mx-auto space-y-2"> 
                     {responses.map((message, index) => (
                         <li
                             key={index}
                             className={`text-primary ${message.sender === 'user' ? 'self-end text-right' : 'self-start text-left'}`}
                         >    
+                        {/* Display the message */}
                             <span className={`inline-block p-2 rounded-lg ${message.sender === 'user' ? 'bg-blue-500 text-white' : 'bg-green-300 text-black'} whitespace-pre-wrap`}>
                                 {message.sender === 'bot' ? (<><SmartToyIcon fontSize='medium' /> </>) : (<><PersonIcon fontSize='medium'/> </>)}
                                 {message.type === 'gif' ? (
@@ -284,6 +310,7 @@ const Chat: React.FC<ChatProps> = ({ token }) => {
                                     message.text
                                 )}
                             </span>
+                            {/* Display the suggestion buttons */}
                             {message.buttons && (
                             <div className="mt-2">
                                 {message.buttons.map((button, idx) => (
@@ -323,6 +350,7 @@ const Chat: React.FC<ChatProps> = ({ token }) => {
                         tabIndex={-1}
                         startIcon={<CloudUploadIcon />}
                         style={{marginLeft: '10px', marginRight: '15px'}}
+                        disabled={fetching}
                     >
                         Upload
                         <VisuallyHiddenInput type="file" onChange={handleFileChange} accept=".txt,.docx,.pdf" />

@@ -1,0 +1,11 @@
+{
+    "New Step": {
+        "New Part": {
+            "content": "Your Prompt...",
+            "from": {
+                "Step": "",
+                "Section": ""
+            }
+        },
+    }
+}

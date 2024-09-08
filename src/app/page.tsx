@@ -22,15 +22,26 @@ export default function Page() {
   const [login, setLogin] = useState(false);
   const [email, setEmail] = useState<string>('');
 
+  // trigger the refresh page operation when the page is loaded
+  window.onload = async function() {
+    await axios.post('http://localhost:8080/refresh_page', {email: email})
+    .then(response => {
+      console.log('Page refresh operation success:', response.data);
+    })
+    .catch(error => {
+      console.error('Error refreshing:', error);
+    });
+};
+
 
   const handleRegister = () => {
-    setLogin(true);
+    setLogin(true); // Set the login state to true
   }
 
   useEffect(() => {
-    const savedEmail = localStorage.getItem('email');
+    const savedEmail = localStorage.getItem('email'); // Get the email from localStorage
     if (savedEmail) {
-      setEmail(savedEmail);
+      setEmail(savedEmail); // Set the email state to the saved email
     }
 
     // Check if the token exists before setting up the interval
@@ -45,7 +56,7 @@ export default function Page() {
     }
   }, [token]);
 
-
+  // If the token is not set, show the login form
   if (!token && !login)  {
     return (
       <div className="h-16 bg-gradient-to-r from-purple-500 to-pink-500">
@@ -60,7 +71,7 @@ export default function Page() {
       </div>
     )
   }
-
+  // If the token is not set and the login state is true, show the register form
   if (!token && login) {
     return (
       <div className="h-16 bg-gradient-to-r from-purple-500 to-pink-500">
@@ -72,24 +83,23 @@ export default function Page() {
       </div>
     )
   }
+  
 
   const refreshToken = async () => {
-    
-    const res = await axios.get('http://localhost:8080/refresh_token',{
-      headers: {
-        'Authorization': `Bearer ${token}`,
-      },
-    });
+    const newEmail = localStorage.getItem('email');
+    const res = await axios.post('http://localhost:8080/refresh_token',{email: newEmail});
     if (res.data.access_token) {
       setToken(res.data.access_token);
     }
   }
 
-
+  // Logout function
   const handleLogout = async () => {
     const res = await axios.post('http://localhost:8080/logout');
     // Clear any client-side authentication data (e.g., localStorage)
     setSelectedComponent('chat');
+    localStorage.removeItem('email');
+    setEmail('');
     if (res) {
       removeToken();
     }
@@ -126,7 +136,7 @@ export default function Page() {
           <Template token={token}/>
         </div>
         <div style={{ display: selectedComponent === 'project' ? 'block' : 'none' }}>
-          <Project token={token} />
+          <Project email={email} token={token} />
         </div>
       </div>
       </div>

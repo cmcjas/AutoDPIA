@@ -7,6 +7,7 @@ from pydantic import BaseModel
 from typing import Any
 from langchain_chroma import Chroma
 from langchain.retrievers.multi_vector import MultiVectorRetriever
+from crewai import Task, Crew, Process
 
 from reportlab.lib.pagesizes import A4
 from reportlab.lib import colors
@@ -46,14 +47,18 @@ def clear_chat_embed(vectorstore, user_id, BASE_DIR):
         else:
             print(f"Directory does not exist: {directory_path}")
 
-def create_template(base_dir, session):
+def create_template(base_dir, session, filename):
     prepopulated_format = ""
     # Open the file and read its content
-    with open(base_dir + '/template/uk_gov.txt', 'r') as file:
+    with open(base_dir + f'/template/{filename}', 'r') as file:
         prepopulated_format = file.read()
-    
+
     # Create a Template object
-    template_entry = Template(tempID=1, userID=0, tempName="UK GOV (Default)", tempData=prepopulated_format)
+    if filename == "UK ICO (Default).txt":
+        template_entry = Template(tempID=1, userID=0, tempName=f'{filename}'.split('.')[0], tempData=prepopulated_format)
+    else:
+        template_entry = Template(tempID=2, userID=0, tempName=f'{filename}'.split('.')[0], tempData=prepopulated_format)
+
     # Add the entry to the session and commit
     try:
         session.add(template_entry)
@@ -119,15 +124,13 @@ class Element(BaseModel):
     text: Any
 
 def partition_process(UP_DIR, user_id, project_id, filenames, IMG_DIR_C, IMG_DIR_CD, model, embeddings, filter, id_key, file_name, embed_type, usage, mode):
-        
         BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-        # initial prompt
+        # initial prompt for summarization
         prompt_int = """You are an assistant tasked with summarizing tables and text. \
         Give a concise summary of the table or text. Table or text chunk: {element} """
         prompt = ChatPromptTemplate.from_template(prompt_int)
 
         vectorstore = Chroma(collection_name=f"summary_{user_id}", embedding_function=embeddings, persist_directory=BASE_DIR + "/vectorDB/")
-
         print('TEST', filenames)
         if mode == "chat":
             doc_filter = {'file_name': filenames[0]}
@@ -137,13 +140,12 @@ def partition_process(UP_DIR, user_id, project_id, filenames, IMG_DIR_C, IMG_DIR
             doc_filter = {"$or": [{'file_name': f + '.pdf'} for f in filenames]}  
 
         for filename in filenames:
-
             if mode == "chat":
                 existing_documents = vectorstore.get(where={"usage": "chat"})['ids']
                 fs = LocalFileStore(BASE_DIR + "/vectorDB/" + "parentData/" + user_id + '/chat/' + filename)
                 # The storage layer for the parent documents
                 store = create_kv_docstore(fs)
-
+         
                 retriever = MultiVectorRetriever(
                     vectorstore=vectorstore,
                     docstore=store,
@@ -180,8 +182,7 @@ def partition_process(UP_DIR, user_id, project_id, filenames, IMG_DIR_C, IMG_DIR
                     }},
                 )
 
-            if len(existing_documents) == 0:
-
+            if len(existing_documents) == 0: # If no existing documents embedding are found, start indexing
                 # Get PDF elements
                 pdf_elements = partition_pdf(
                 filename=os.path.join(UP_DIR, filename), 
@@ -202,10 +203,8 @@ def partition_process(UP_DIR, user_id, project_id, filenames, IMG_DIR_C, IMG_DIR
                 overlap=200,
                 extract_image_block_output_dir=IMG_DIR_C
                 )
-                
                 # Create a dictionary to store counts of each type
                 category_counts = {}
-
                 for element in pdf_elements:
                     category = str(type(element))
                     if category in category_counts:
@@ -216,7 +215,6 @@ def partition_process(UP_DIR, user_id, project_id, filenames, IMG_DIR_C, IMG_DIR
                 # Unique_categories will have unique elements
                 unique_categories = set(category_counts.keys())
                 category_counts
-
                 # Categorize by type
                 categorized_elements = []
                 for element in pdf_elements:
@@ -228,11 +226,10 @@ def partition_process(UP_DIR, user_id, project_id, filenames, IMG_DIR_C, IMG_DIR
                 # Tables
                 table_elements = [e for e in categorized_elements if e.type == "table"]
                 print(len(table_elements))
-
                 # Text
                 text_elements = [e for e in categorized_elements if e.type == "text"]
                 print(len(text_elements))
-
+                # chain for summarisation of text and tables
                 summary_chain = {"element": lambda x: x} | prompt | model | StrOutputParser()
 
                 # Apply to text
@@ -263,8 +260,7 @@ def partition_process(UP_DIR, user_id, project_id, filenames, IMG_DIR_C, IMG_DIR
                     with open(file_path, "r") as file:
                         img_summary.append(file.read())
                 
-
-                # Add texts
+                # Add raw texts and summaries
                 if texts:
                     doc_ids = [str(uuid.uuid4()) for _ in texts]
                     summary_texts = [
@@ -275,7 +271,7 @@ def partition_process(UP_DIR, user_id, project_id, filenames, IMG_DIR_C, IMG_DIR
                     retriever.vectorstore.add_documents(summary_texts)
                     retriever.docstore.mset(list(zip(doc_ids, texts)))
 
-                # Add tables
+                # Add raw tables and summaries
                 if tables:
                     table_ids = [str(uuid.uuid4()) for _ in tables]
                     summary_tables = [
@@ -322,15 +318,15 @@ class DPIAPDFGenerator:
         data = []
         styles = getSampleStyleSheet()
         row_colors = []
-        for i, (step, content) in enumerate(self.dpia.items()):
+        for i, (step, content) in enumerate(self.dpia.items()): # Loop through each step
             data.append([Paragraph(f"<b>{step}</b>", styles['Normal']), ""])
             row_colors.append(colors.lightblue if i % 2 == 0 else colors.lightgrey)
             for sub_step, description in content.items():
-                description = description.replace("\n", "<br/>")
-                data.append([Paragraph(f"<b>{sub_step}</b>", styles['Normal']), Paragraph(description, styles['Normal'])])
-                row_colors.append(None)  # No color for sub-steps
+                description = description.replace("\n", "<br/>") # Replace newlines with HTML line breaks
+                data.append([Paragraph(f"<b>{sub_step}</b>", styles['Normal']), Paragraph(description, styles['Normal'])]) # Add sub-step
+                row_colors.append(None)  # No color for sub-steps 
 
-        table = Table(data, colWidths=[self.width * 0.2, self.width * 0.7], splitInRow=1)
+        table = Table(data, colWidths=[self.width * 0.2, self.width * 0.7], splitInRow=1) # Split rows
         table.setStyle(TableStyle([
             ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
             ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
@@ -382,3 +378,33 @@ class DPIAPDFGenerator:
         page_num = canvas.getPageNumber()
         text = f"Page {page_num}"
         canvas.drawRightString(doc.pagesize[0] - 30, 15, text)  # Using doc.pagesize[0] to get the width of the page
+
+
+def split_text_into_chunks(text, chunk_size=6500):
+    return [text[i:i + chunk_size] for i in range(0, len(text), chunk_size)]
+
+def expanded_response(initial_answer, rerank_content, prompt, first_agent, second_agent):
+    expand_answer = Task(
+        description= (f"""Based on the provided context: {initial_answer}\n {rerank_content}\n 
+                        Provide a detailed answer to the prompt: {prompt}.
+                        Fill in any missing information if necessary.
+                        References and citations are not relevant."""),
+        expected_output=(f"""Return an accurate and coherent response in a professional tone."""),
+        agent=first_agent,
+    )
+
+    final_answer = Task(
+        description= (f"""Based on the prompt: {prompt}\n
+                      Return an answer that is free from any grammatical errors and is well-structured."""),
+        agent=second_agent,
+        expected_output=(f"""Return a professional formatted text."""),
+        context=[expand_answer]
+    )
+
+    crew = Crew(
+        agents=[first_agent, second_agent],
+        tasks=[expand_answer, final_answer],
+        processes=Process.sequential
+    )
+    return crew
+

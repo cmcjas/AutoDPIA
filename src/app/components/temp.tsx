@@ -34,6 +34,7 @@ const Template: React.FC<TempProps> = ({ token }) => {
 
     const [open, setOpen] = useState(false);
     const [name, setName] = useState('');
+    const [taskID, setTaskID] = useState<string>('');
 
     const chatParent = useRef<HTMLUListElement>(null)
     useEffect(() => {
@@ -52,7 +53,7 @@ const Template: React.FC<TempProps> = ({ token }) => {
             } catch (err) {
                 setError(error);
             }
-            };
+        };
         fetchTemplates();
     }, [error, open, token, processing]);
 
@@ -82,7 +83,7 @@ const Template: React.FC<TempProps> = ({ token }) => {
     } else {
         templateData = JSON.parse(selectedTemplateData);
     }
-
+    // upload file for template extraction
     const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
         setMessage('');
         let File
@@ -109,24 +110,35 @@ const Template: React.FC<TempProps> = ({ token }) => {
           });
 
             if (res) {
-                formData.append('Filename', res.data['filename']);
+                const resStart = await axios.post('http://localhost:8080/start_task',  
+                    {
+                        fileName: res.data['filename'],
+                        taskName: 'extract_template',
+                    },
+                    {
+                    headers : {
+                        'Authorization': `Bearer ${token}`
+                    }
+                });
 
-                try {
-                    const extract = await axios.post('http://localhost:8080/extract_template', formData, {
-                        headers : {
-                            'Content-Type': 'multipart/form-data',
+                setTaskID(resStart.data['task_id']);
+
+                const result = await axios.get('http://localhost:8080/get_task_result',
+                    {
+                        params: {
+                            taskID: resStart.data['task_id'],
+                            taskName: 'extract_template'
+                        },
+                        headers: {
                             'Authorization': `Bearer ${token}`
                         }
-                    });
+                    }
+                );
 
-                    setMessage(extract.data.message);
-                    setProcessing(false);
-                    setSelectedTemplate(res.data.tempName);
-                } catch (error) {
-                    console.error('Error extracting template', error);
-                    setMessage('Not a valid DPIA template or name already exists.');
-                    setProcessing(false);
-                }
+                setMessage(result.data['result']);
+                setProcessing(false);
+                setSelectedTemplate(res.data.tempName);
+
             } else {
                 console.error('Failed to upload file.');
             }
@@ -138,14 +150,17 @@ const Template: React.FC<TempProps> = ({ token }) => {
         }
         
     };
-
+    // select from existing templates
     const selectTempData = async () => {
         try {
-            const res = await axios.post('http://localhost:8080/select_template', editableData, {
+            const res = await axios.post('http://localhost:8080/select_template', 
+            {
+                tempName: selectedTemplate,
+                tempData: editableData
+            },
+            {
                 headers: {
-                    'Content-Type': 'application/json',
                     'Authorization': `Bearer ${token}`
-
                 }
             });
 
@@ -163,7 +178,9 @@ const Template: React.FC<TempProps> = ({ token }) => {
         selectTempData();
     }, [editableData]);
 
+    console.log(selectedTemplate, selectedTempUserID);
 
+    // Add a new part to a step
     const handleAddPart = (step: string, title: string) => {
         // Create a copy of the current editableData
         const updatedData = { ...editableData };
@@ -202,7 +219,7 @@ const Template: React.FC<TempProps> = ({ token }) => {
         // Update the state with the new data
         setEditableData(updatedData);
     };
-
+    // Delete a part from a step
     const handleDeletePart = (step: string, title: string) => {
         // Create a copy of the current editableData
         const updatedData = { ...editableData };
@@ -218,7 +235,7 @@ const Template: React.FC<TempProps> = ({ token }) => {
         setEditableData(updatedData);
     };
 
-
+    // Add a new step to the template
     const handleAddStep = (step: string) => {
         // Create a copy of the current editableData
         const updatedData = { ...editableData };
@@ -274,7 +291,7 @@ const Template: React.FC<TempProps> = ({ token }) => {
         setEditableData(newUpdatedData);
     };
 
-
+    // Delete a step from the template
     const handleDeleteStep = (step: string) => {
         // Create a copy of the current editableData
         const updatedData = { ...editableData };
@@ -344,7 +361,6 @@ const Template: React.FC<TempProps> = ({ token }) => {
         setEditableData(finalData);
     };
     
-
     const [openTitle, setOpenTitle] = useState(false);
     const [currentStep, setCurrentStep] = useState<string | null>(null);
     const [currentTitle, setCurrentTitle] = useState('');
@@ -353,32 +369,33 @@ const Template: React.FC<TempProps> = ({ token }) => {
     const [openStep, setOpenStep] = useState(false);
     const [newStep, setNewStep] = useState('');
 
+    // Open the dialog and set the current step and title
     const handleOpenTitle = (step: string, title: string) => {
         setCurrentStep(step);
         setCurrentTitle(title);
         setNewTitle(title);
         setOpenTitle(true);
       };
-    
+    // Close the dialog and reset the current step and title
     const handleCloseTitle = () => {
     setOpenTitle(false);
     setCurrentStep(null);
     setCurrentTitle('');
     setNewTitle('');
     };
-
+    // Submit the new title and update the data
     const handleOpenStep = (step: string) => {
         setOpenStep(true);
         setCurrentStep(step);
         setNewStep(step);
     }
-
+    // Close the dialog and reset the current step
     const handleCloseStep = () => {
         setOpenStep(false);
         setCurrentStep(null);
         setNewStep('');
     }
-
+    // submit a new title for the part
     const handleTitleSubmit = () => {
     if (currentStep && currentTitle) {
         setEditableData(prevData => {
@@ -392,7 +409,8 @@ const Template: React.FC<TempProps> = ({ token }) => {
     }
     handleCloseTitle();
     };
-
+    
+    // Submit a new title for the step
     const handleStepSubmit = () => {
         if (currentStep) {
             setEditableData(prevData => {
@@ -404,7 +422,7 @@ const Template: React.FC<TempProps> = ({ token }) => {
         }
         handleCloseStep();
     }
-
+    // change prompt content
     const handlePromptChange = (step: string, title: string, newPrompt: Prompt) => {
         setEditableData(prevData => {
             const newData = { ...prevData };
@@ -448,8 +466,7 @@ const Template: React.FC<TempProps> = ({ token }) => {
         }
 
       };
-
-
+     // delete a template
       const handleDelete = async () => {
         setError(true);
         const res = await axios.post('http://localhost:8080/delete_template', selectedTemplate, {
@@ -463,6 +480,19 @@ const Template: React.FC<TempProps> = ({ token }) => {
         }
       }
 
+      const cancelExtract = async () => {
+        setProcessing(false);
+        if (taskID) {
+            const cancel = await axios.post('http://localhost:8080/cancel_task', { taskID: taskID },
+                {
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    }
+                }
+            );
+        }
+
+      }
 
     return (
         <main className="flex flex-col w-full h-screen max-h-dvh bg-background">
@@ -492,12 +522,15 @@ const Template: React.FC<TempProps> = ({ token }) => {
                     style={{marginLeft: '20px'}}
                     disabled={processing}
                 >
-                    Template
+                    Extract
                     <VisuallyHiddenInput type="file" onChange={handleFileChange} accept=".txt,.docx,.pdf" />
                     {processing && (
                         <img src='/loading-gif.gif' alt="GIF" style={{ marginLeft:'20px', width:'30px', height:'30px', marginRight: '15px'}}/>
                     )}
                 </Button>
+                {processing && (
+                    <Button variant="outlined" color="secondary" style={{marginLeft: '15px'}} onClick={() => cancelExtract()}>Cancel</Button>
+                )}
                 <p>{message}</p>
             </Box>
             </Box>

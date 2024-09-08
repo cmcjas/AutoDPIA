@@ -3,7 +3,7 @@
 import { Button, Dialog, DialogActions, DialogContent, DialogTitle, Box, Checkbox, TextField } from "@mui/material";
 import { useRef, useEffect, useState } from 'react'
 import axios from 'axios';
-import { Report } from "./report";
+import Report from "./report";
 
 import List from '@mui/material/List';
 import ListItem from '@mui/material/ListItem';
@@ -15,9 +15,10 @@ import Grid from '@mui/material/Grid';
 
 interface ProjProps {
     token: string | null;
+    email: string;
 }
 
-const Project: React.FC<ProjProps> = ({ token }) => {
+const Project: React.FC<ProjProps> = ({ email, token }) => {
 
     const [projects, setProjects] = useState<{ projectID: number; title: string; description: string }[]>([]);
     const [selectedPrjs, setSelectedPrjs] = useState<number[]>([]);
@@ -33,9 +34,6 @@ const Project: React.FC<ProjProps> = ({ token }) => {
     const [description, setDescription] = useState<string>('');
 
     const chatParent = useRef<HTMLUListElement>(null)
-    useEffect(() => {
-        const domNode = chatParent.current
-    })
 
     const filteredProjects = projects.filter(doc =>
         doc.title.toLowerCase().includes(searchQuery.toLowerCase())
@@ -165,7 +163,7 @@ const Project: React.FC<ProjProps> = ({ token }) => {
                                 {selectedPrjs.length === filteredProjects.length ? 'Deselect All' : 'Select All'}
                             </Button>
                             {selectedPrjs.length > 0 && (
-                            <Button variant="contained" color="secondary" onClick={handleProjectDelete} style={{ marginLeft: '20px' }}>
+                            <Button variant="outlined" color="secondary" onClick={handleProjectDelete} style={{ marginLeft: '20px' }}>
                                 Delete
                             </Button>
                             )}
@@ -215,7 +213,7 @@ const Project: React.FC<ProjProps> = ({ token }) => {
                         </Grid>
                     </div> 
                 ) : (
-                    <Report token={token} projectID={projectID} title={title} description={description}/>
+                    <Report email={email} token={token} projectID={projectID} title={title} description={description}/>
                 )}      
             </section>
 

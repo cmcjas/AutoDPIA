@@ -6,7 +6,7 @@ import { useEffect, useState } from 'react'
 import axios from 'axios';
 import { pdfjs } from 'react-pdf';
 import PDFView from "./view";
-import { Dpia } from "./dpia";
+import Dpia from "./dpia";
 import Snackbar, { SnackbarOrigin } from '@mui/material/Snackbar';
 import { styled } from '@mui/material/styles';
 
@@ -31,6 +31,7 @@ interface ReportProps {
   projectID: number;
   title: string;
   description: string;
+  email: string;
 }
 
 const VisuallyHiddenInput = styled('input')({
@@ -46,10 +47,11 @@ const VisuallyHiddenInput = styled('input')({
   });
 
 
-export function Report(props: ReportProps) {
+const Report: React.FC<ReportProps> = ({ email, token, projectID, title, description }) => {
 
     const [activeTab, setActiveTab] = useState('files');
     const [fileActiveTab, setFileActiveTab] = useState('files');
+    let generating;
 
     const [uploadMessage, setUploadMessage] = useState('');
     const [open, setOpen] = useState(false);
@@ -66,11 +68,6 @@ export function Report(props: ReportProps) {
     const filteredDocuments = documents.filter(doc =>
         doc.fileName.toLowerCase().includes(searchQuery.toLowerCase())
     );
-
-    const projectID = props.projectID;
-    const title = props.title;
-    const description = props.description;
-    const token = props.token;
 
     const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
         
@@ -276,7 +273,7 @@ export function Report(props: ReportProps) {
                             {selectedDpiaDocs.length === filteredDocuments.length ? 'Deselect All Dpia Files' : 'Select All Dpia Files'}
                         </Button>
                         {selectedDocs.length > 0 && (
-                        <Button variant="contained" color="secondary" onClick={handleFileDelete} style={{ marginLeft: '20px' }}>
+                        <Button variant="outlined" color="secondary" onClick={handleFileDelete} style={{ marginLeft: '20px' }}>
                             Delete
                         </Button>
                         )}
@@ -339,7 +336,7 @@ export function Report(props: ReportProps) {
                     </Grid>
                 </div>
             ) : (
-                <Dpia token={token} title={title} description={description} projectID={projectID} dpiaFileNames={selectedDpiaDocName} status={""}/>
+                <Dpia email={email} token={token} title={title} description={description} projectID={projectID} dpiaFileNames={selectedDpiaDocName} status={""}/>
             )}
 
             <Dialog open={open} onClose={handleClose}  fullWidth maxWidth="lg">
@@ -356,3 +353,5 @@ export function Report(props: ReportProps) {
         </main>
     );
 }
+
+export default Report;

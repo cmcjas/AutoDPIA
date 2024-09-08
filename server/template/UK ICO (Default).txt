@@ -1,0 +1,112 @@
+{
+    "Step 1 - Identify the Need for a DPIA": {
+        "Project Overview": {
+            "content": "Broadly summarise the project described in the documents you have been given. In this summary, ensure you explain the goal of the project \u2013 what the project owners aim to achieve. Also mention what type of data will be processed. Conclude the summary with a brief explanation as to why a DPIA (Data Protection Impact Assessment) is required. Write this summary in a professional language, with approximately 300 words.",
+            "from": {"Step": "", "Section": ""}
+        }
+    },
+    "Step 2 - Describe the Processing": {
+        "Data Collection": {
+            "content": "Describe how the project will collect, use, store, and delete the data. In this paragraph, describe the type of data in detail. Where does the data originate from? Will the data come from multiple sources? Write this summary in a professional language, with approximately 250 words.",
+            "from": {"Step": "", "Section": ""}
+        },
+        "High Risk Methods": {
+            "content": "Briefly describe any processing methods that are classified as high risks. Explain the methods and the risks in detail. If no risks are present, say that instead. Write this paragraph in a professional language, with approximately 3 sentences per risk.",
+            "from": {"Step": "", "Section": ""}
+        },
+        "3rd Party Sharing": {
+            "content": "Describe whether the data collected in the project will be shared with any third parties. Describe the outside parties and determine whether any risks are created by sharing data with them. Write this summary in a professional language, with approximately 100 words.",
+            "from": {"Step": "", "Section": ""}
+        }
+    },
+    "Step 2.1 - Describe the Scope of the Process": {
+        "Nature of the Data": {
+            "content": "Describe the nature of the data that this project wishes to collect. Mention the category that this type of data fits in. Mention whether or not criminal offence data is used in the project. Write this summary in a professional language, with approximately 200 words.",
+            "from": {"Step": "", "Section": ""}
+        },
+        "Amount of Data": {
+            "content": "Describe the amount of data that is planned to be collected for this project. Mention the geographical area that all this data comes from, if the documents provide one. Describe how often the data will be collected and how long the data will be kept for. Describe how the collection of this data might affect individuals. Write this summary in a professional language, with approximately 200 words.",
+            "from": {"Step": "", "Section": ""}
+        }
+    },
+    "Step 2.2 - Describe the Context of the Processing": {
+        "Rights of the Subjects": {
+            "content": "Describe the relationship between the people running this project and the people from which data will be collected. Describe the rights of the individuals whose data is being collected. Mention each right that these individuals have. Describe whether the individuals would expect their data to be used however this project uses their data. Write this summary in a professional language, with approximately 300 words.",
+            "from": {"Step": "", "Section": ""}
+        },
+        "Prior Concerns": {
+            "content": "Describe any prior concerns over this type of data processing. Describe any security flaws related to this type of data processing. Mention whether the project involves the data of children or other vulnerable groups. Describe whether the project relates to any current issues of public concern. Write this summary in a professional language, with approximately 250 words.",
+            "from": {"Step": "", "Section": ""}
+        },
+        "New Concepts": {
+            "content": "Describe whether this project uses a new concept in regards to data processing. Write this summary in a professional language, with approximately 50 words.",
+            "from": {"Step": "", "Section": ""}
+        },
+        "Code of Conduct": {
+            "content": "Describe whether the project includes any approved code of conduct or certification schemes. Write this summary in a professional language, with approximately 50 words.",
+            "from": {"Step": "", "Section": ""}
+        }
+    },
+    "Step 2.3 - Describe the Purpose of the Processing": {
+        "Data Processing Goal": {
+            "content": "Describe the goal behind this data processing. Describe the purpose of the project and its intended effect on individuals. Mention whether the intended effect will affect only the people whose data was collected or the general public. Describe the benefits of the data processing. Write this summary in a professional language, with approximately 300 words.",
+            "from": {"Step": "", "Section": ""}
+        }
+    },
+    "Step 3 - Consultation Process": {
+        "Consulting Individual Stakeholders": {
+            "content": "Describe whether the project organisers plan on consulting individual stakeholders. If the project will consult individuals, describe when and how these individuals views will be obtained. Describe how much these individuals will know about the project when they give their opinions. Write this summary in a professional language, with approximately 150 words.",
+            "from": {"Step": "", "Section": ""}
+        },
+        "Third Parties": {
+            "content": "Describe whether any third parties will be involved with the project. Describe whether these third parties will assist with data processing or whether they will have access to the data. Write this summary in a professional language, with approximately 200 words.",
+            "from": {"Step": "", "Section": ""}
+        },
+        "Information Security Experts": {
+            "content": "Describe whether the project organisers have consulted any information security experts or whether they plan on consulting information security experts. Describe how the project organisers plan on keeping the data secure from any threats. Write this summary in a professional language, with approximately 200 words.",
+            "from": {"Step": "", "Section": ""}
+        }
+    },
+    "Step 4 - Assess Necessity and Proportionality": {
+        "Lawful Basis": {
+            "content": "Describe any lawful basis the documents mention that allow the project organisers to collect all of this data. Describe any legal codes or statutory guidelines that relate to this data processing. Write this summary in a professional language, with approximately 200 words for every legal basis. If you can\u2019t gather this information, try to infer based on the documents.",
+            "from": {"Step": "", "Section": ""}
+        },
+        "Similar Methods": {
+            "content": "Using the project documents, describe any other methods mentioned that will achieve the same outcome as the project\u2019s objective. If no other methods are mentioned, simply state that. Why are these methods not as good as the project's method. Write this summary in a professional language, with approximately 200 words.",
+            "from": {"Step": "", "Section": ""}
+        },
+        "Function Creep": {
+            "content": "Describe how the project will prevent function creep. Describe how the project will avoid the gradual widening of this technology to beyond what it was originally intended to do. If function creep is not mentioned, simply state that no prevention no methods have been provided as of yet. Write this summary in a professional language, with approximately 150 words.",
+            "from": {"Step": "", "Section": ""}
+        },
+        "Data Minimisation": {
+            "content": "Describe how the project will ensure data quality and data minimisation. If data minimisation is not mentioned, simply state that no methods have been provided as of yet. Write this summary in a professional language, with approximately 150 words.",
+            "from": {"Step": "", "Section": ""}
+        },
+        "Rights of the Subjects": {
+            "content": "Describe what information will be given to the individuals whose data has been collected. Describe the rights of those individuals and how these individuals rights will be protected. Write this summary in a professional language, with approximately 150 words.",
+            "from": {"Step": "", "Section": ""}
+        },
+        "Confidentiality": {
+            "content": "Describe the measures taken to ensure that the people who process the data will remain confidential. Describe the policies and procedures that ensure the security of the data. Write this summary in a professional language, with approximately 150 words.",
+            "from": {"Step": "", "Section": ""}
+        },
+        "International Transfers": {
+            "content": "Describe whether the data will involve international transfers. If the data does involve international transfers, describe how security is maintained overseas. Write this summary in a professional language, with approximately 150 words.",
+            "from": {"Step": "", "Section": ""}
+        }
+    },
+    "Step 5 - Identify and Assess Risks": {
+        "Identified Risks": {
+            "content": "Using the documents given, create a numbered list of all the risks associated with this project. The list should have a maximum limit of 7 risks, so choose the most important risks. For each risk, use only one sentence to describe the risk. Place a newline. Assess the likelihood of harm of this specific risk using one of three options: remote, possible, or probable. Place another newline. Assess the severity of harm of this specific risk using one of three options: minimal, significant, or severe. Place another newline. Assess the overall risk of this specific risk using one of three options: low, medium, or high. Place two newlines. Repeat this process for every risk mentioned in the project.",
+            "from": {"Step": "", "Section": ""}
+        }
+    },
+    "Step 6 - Identify Measures to Reduce Risk": {
+        "Identified Solutions": {
+            "content": "I will give you a list of risks. For each risk, repeat the risk. Place a newline. Describe a potential solution to mitigate this risk. Assess the effect this solution would have on the risk using only one of three options: eliminated, reduced, or accepted. Place another newline. Assess the residual risk after this solution is put into place using only one of three options: low, medium, or high. Repeat the following phrase 'Measure Approved: Y/N'. Place two newlines. Repeat this process for every risk provided.",
+            "from": {"Step": "Step 5 - Identify and Assess Risks", "Section": "Identified Risks"}
+        }
+    }
+}
