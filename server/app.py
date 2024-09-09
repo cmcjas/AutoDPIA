@@ -989,7 +989,6 @@ def generate_dpia(self, data):
         assign_model = ChatOllama(model="qwen2:7b-instruct-q8_0", temperature=0.0, num_ctx=8000)
         partition_model = ChatOllama(model="phi3:3.8b-mini-128k-instruct-q8_0", temperature=0.0, num_ctx=8000)
         general_model = ChatOllama(model="gemma2", temperature=0.0, num_ctx=8000)
-        llm = ChatOpenAI(api_key=OPENAI_API_KEY, model="gpt-4o-mini", temperature=0.0)
 
         IMG_DIR_R = os.path.join(BASE_DIR, "figures", data.get('user_id', ''), str(project_id))
         IMG_DIR_RD = os.path.join(BASE_DIR, "figures", data.get('user_id', ''), str(project_id) + "_Description")
