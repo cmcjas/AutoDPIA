@@ -34,6 +34,7 @@ const Project: React.FC<ProjProps> = ({ email, token }) => {
     const [description, setDescription] = useState<string>('');
 
     const chatParent = useRef<HTMLUListElement>(null)
+    const [message, setMessage] = useState<string>('')
 
     const filteredProjects = projects.filter(doc =>
         doc.title.toLowerCase().includes(searchQuery.toLowerCase())
@@ -107,24 +108,30 @@ const Project: React.FC<ProjProps> = ({ email, token }) => {
     };
 
     const handleSaveProject = async () => {
-        // API call to save project details
-        const projectData = {
-            title: projectTitle,
-            description: projectDescription
-        }
-        console.log('Sending project data:', projectData)
-        const res = await axios.post('http://localhost:8080/create_project', projectData, {
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${token}`
-            },
-        });
 
-        if (res) {
-            setOpenDialog(false);
-        } else {
-            // Handle error
-            console.error('Failed to create project');
+        try {
+            // API call to save project details
+            const projectData = {
+                title: projectTitle,
+                description: projectDescription
+            }
+            console.log('Sending project data:', projectData)
+            const res = await axios.post('http://localhost:8080/create_project', projectData, {
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+            });
+
+            if (res) {
+                setOpenDialog(false);
+            } else {
+                // Handle error
+                console.error('Failed to create project');
+            }
+        } catch (error) {
+            console.error('Error creating project:', error);
+            setMessage('Ensure title and description are filled');
         }
     };
 
@@ -237,6 +244,7 @@ const Project: React.FC<ProjProps> = ({ email, token }) => {
                         onChange={(e) => setProjectDescription(e.target.value)}
                     />
                 </DialogContent>
+                <p>{message}</p>
                 <DialogActions>
                     <Button onClick={handleCloseDialog}>Cancel</Button>
                     <Button onClick={handleSaveProject} color="primary">Save Project</Button>
