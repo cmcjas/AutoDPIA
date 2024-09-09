@@ -80,7 +80,7 @@ engine = db.create_engine('sqlite:///instance/info.db', echo=True)
 Session = sessionmaker(bind=engine)
 session = Session()
 
-for fileName in ['UK ICO (Default).txt', 'Test1.txt']:
+for fileName in ['UK ICO (Default).txt', 'NEW.txt']:
     create_template(BASE_DIR, session, fileName) # create default templates
 
 load_dotenv()
