@@ -1,9 +1,0 @@
-python3-pip
-npm
-nvidia-cuda-toolkit
-sqlite3
-poppler-utils
-tesseract-ocr
-python3-poetry
-libreoffice
-redis-tools
