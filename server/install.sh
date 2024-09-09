@@ -11,8 +11,10 @@ sudo apt install tesseract-ocr
 sudo apt install python3-poetry
 sudo apt install libreoffice
 
+# install torch and flash-attention
+pip install torch==2.3.0 torchvision torchaudio --index-url https://download.pytorch.org/whl/cu118
+pip install wheel
+pip install flash-attn --no-build-isolation
+
 # Install secondary dependencies
 pip install -r requirements.txt
-
-# Start the Flask application
-python myapp.py
